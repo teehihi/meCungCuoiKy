@@ -175,16 +175,19 @@ def bfs(start, goal, maze):
 def dfs(start, goal, maze):
     ROWS, COLS = len(maze), len(maze[0])
     stack = [(start, [start])]
-    visited = set()
+    visited = {start}
+
     while stack:
         (r, c), path = stack.pop()
-        if (r, c) == goal: return path
-        if (r, c) in visited: continue
-        visited.add((r, c))
-        for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
+        if (r, c) == goal:
+            return path
+
+        # Duyệt theo thứ tự cố định
+        for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:
             nr, nc = r+dr, c+dc
-            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
-                stack.append(((nr, nc), path+[(nr, nc)]))
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr,nc) not in visited:
+                visited.add((nr,nc))
+                stack.append(((nr,nc), path + [(nr,nc)]))
     return []
 
 def draw_path(path, color):
@@ -307,8 +310,20 @@ def end_screen(result):
         clock.tick(30)
 
 # =================== GAME LOOP ===================
+
 def game_loop(mode="bfs"):
+    hunter_path = []
     global hunter_timer
+    hunter_timer += 1
+    if hunter_timer >= hunter_speed:
+        path = dfs(tuple(hunter_pos), tuple(player_pos), maze)
+        if len(path) > 1:
+            next_step = path[1]
+            # tránh quay lại ô ngay trước
+            if len(path) > 2 and tuple(path[1]) == tuple(player_pos):
+                next_step = path[1]
+            hunter_pos = list(next_step)
+        hunter_timer = 0
     maze = generate_maze(21, 21)
     ROWS, COLS = len(maze), len(maze[0])
     WIDTH, HEIGHT = COLS*CELL_SIZE, ROWS*CELL_SIZE
@@ -369,9 +384,13 @@ def game_loop(mode="bfs"):
         # Hunter AI
         hunter_timer += 1
         if hunter_timer >= hunter_speed:
-            path = bfs(tuple(hunter_pos), tuple(player_pos), maze) if mode=="bfs" \
-                   else dfs(tuple(hunter_pos), tuple(player_pos), maze)
-            if len(path)>1: hunter_pos=list(path[1])
+            if not path or path[-1] != tuple(player_pos):
+                path = dfs(tuple(hunter_pos), tuple(player_pos), maze)
+
+            if len(path) > 1:
+                hunter_pos = list(path[1])
+                path = path[1:]
+
             hunter_timer = 0
 
         if tuple(player_pos)==tuple(hunter_pos): return "lose"
