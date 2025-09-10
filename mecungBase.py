@@ -160,17 +160,20 @@ def farthest_cell(maze, start):
 def bfs(start, goal, maze):
     ROWS, COLS = len(maze), len(maze[0])
     q = deque([(start, [start])])
-    visited = set()
+    visited = {start}
+
     while q:
         (r, c), path = q.popleft()
-        if (r, c) == goal: return path
-        if (r, c) in visited: continue
-        visited.add((r, c))
-        for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
+        if (r, c) == goal:
+            return path
+
+        for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:  
             nr, nc = r+dr, c+dc
-            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
-                q.append(((nr, nc), path+[(nr, nc)]))
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr,nc) not in visited:
+                visited.add((nr,nc))
+                q.append(((nr,nc), path + [(nr,nc)]))
     return []
+
 
 def dfs(start, goal, maze):
     ROWS, COLS = len(maze), len(maze[0])
@@ -182,7 +185,7 @@ def dfs(start, goal, maze):
         if (r, c) == goal:
             return path
 
-        # Duyệt theo thứ tự cố định
+        # Duyệt theo thứ tự cố định (xuống, phải, lên, trái)
         for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:
             nr, nc = r+dr, c+dc
             if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr,nc) not in visited:
@@ -385,13 +388,17 @@ def game_loop(mode="bfs"):
         hunter_timer += 1
         if hunter_timer >= hunter_speed:
             if not path or path[-1] != tuple(player_pos):
-                path = dfs(tuple(hunter_pos), tuple(player_pos), maze)
+                if mode == "bfs":
+                    path = bfs(tuple(hunter_pos), tuple(player_pos), maze)
+                else:
+                    path = dfs(tuple(hunter_pos), tuple(player_pos), maze)
 
             if len(path) > 1:
                 hunter_pos = list(path[1])
-                path = path[1:]
+                path = path[1:]  # bỏ bước đã đi
 
             hunter_timer = 0
+
 
         if tuple(player_pos)==tuple(hunter_pos): return "lose"
         if tuple(player_pos)==goal: return "win"
