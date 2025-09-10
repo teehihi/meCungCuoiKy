@@ -1,6 +1,8 @@
 import pygame
 import random
 from collections import deque
+from background import ScrollingBackground
+
 
 # =================== SETUP ===================
 CELL_SIZE = 32
@@ -16,9 +18,10 @@ hunter_speed = 5   # càng lớn thì hunter càng chậm
 hunter_timer = 0
 
 # =================== MENU ===================
+font_path = "assets/font/Pixeboy.ttf"
 font = pygame.font.SysFont("Segoe UI", 22)
 big_font = pygame.font.SysFont("Segoe UI", 48, bold=True)
-
+menu_font = pygame.font.Font(font_path, 80)
 def draw_button_adv(rect, text, base_color, hover_color):
     mouse = pygame.mouse.get_pos()
     color = hover_color if rect.collidepoint(mouse) else base_color
@@ -27,19 +30,22 @@ def draw_button_adv(rect, text, base_color, hover_color):
     screen.blit(label, (rect.centerx - label.get_width()//2,
                         rect.centery - label.get_height()//2))
 
+
 def main_menu():
     global screen
     screen = pygame.display.set_mode((600, 400))
 
+    # Load background từ class riêng
     try:
-        bg = pygame.image.load("assets/menu_bg.jpg")
-        bg = pygame.transform.scale(bg, (600, 400))
+        bg = ScrollingBackground("assets/background.png", 400, speed=1)
     except:
         bg = None
 
     while True:
         if bg:
-            screen.blit(bg, (0, 0))
+            bg.draw(screen)
+
+            # Thêm lớp overlay tối
             overlay = pygame.Surface((600, 400))
             overlay.set_alpha(120)
             overlay.fill((0, 0, 0))
@@ -47,19 +53,45 @@ def main_menu():
         else:
             screen.fill((30, 30, 40))
 
-        title = big_font.render("Maze Hunter", True, (255, 215, 0))
+        
+        # --- Title ---
+        title_text = "Maze Hunter"
+        title_color = (255, 215, 0)  # vàng
+        outline_color = (0, 0, 0)    # đen
+
+        title = menu_font.render(title_text, True, title_color)
         screen.blit(title, (300 - title.get_width()//2, 80))
 
-        bfs_btn = pygame.Rect(200, 160, 200, 50)
-        dfs_btn = pygame.Rect(200, 230, 200, 50)
-        exit_btn = pygame.Rect(200, 300, 200, 50)
+    
+        # --- Buttons ---
+        # Load font
+        button_font = pygame.font.Font("assets/font/Pixeboy.ttf", 28)
 
-        draw_button_adv(bfs_btn, "Play BFS Mode", (50, 120, 200), (80, 160, 255))
-        draw_button_adv(dfs_btn, "Play DFS Mode", (50, 200, 100), (90, 250, 150))
-        draw_button_adv(exit_btn, "Exit", (200, 50, 50), (255, 80, 80))
+        def draw_button(text, x, y, w, h, color, hover_color, text_color=(255,255,255)):
+            rect = pygame.Rect(x, y, w, h)
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Nếu chuột nằm trong nút thì đổi màu
+            if rect.collidepoint(mouse_pos):
+                pygame.draw.rect(screen, hover_color, rect, border_radius=10)
+            else:
+                pygame.draw.rect(screen, color, rect, border_radius=10)
+
+            # Render chữ với font custom
+            label = button_font.render(text, True, text_color)
+            screen.blit(label, (x + (w - label.get_width()) // 2,
+                                y + (h - label.get_height()) // 2))
+            return rect
+
+
+        bfs_btn = draw_button("Play BFS Mode", 180, 160, 240, 50, (70,130,180), (100,160,220))
+        dfs_btn = draw_button("Play DFS Mode", 180, 220, 240, 50, (34,139,34), (60,179,60))
+        exit_btn = draw_button("Exit",          180, 280, 240, 50, (178,34,34),(220,50,50))
+
 
         pygame.display.flip()
 
+        # --- Sự kiện ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "exit"
@@ -70,6 +102,7 @@ def main_menu():
                     return "dfs"
                 elif exit_btn.collidepoint(event.pos):
                     return "exit"
+
         clock.tick(30)
 
 # =================== LOAD ASSETS ===================
