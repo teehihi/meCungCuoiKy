@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 from collections import deque
 from background import ScrollingBackground
 import os
@@ -19,8 +20,23 @@ screen = pygame.display.set_mode((1, 1))
 pygame.display.set_caption("Maze Hunter with BFS & DFS")
 clock = pygame.time.Clock()
 
-hunter_speed = 5   # càng lớn => hunter càng chậm
-hunter_timer = 0
+hunter_speed = 8   # càng lớn => hunter càng chậm
+player_speed = 2   # càng lớn => player animation càng chậm
+hunter_anim_speed = 2   # càng lớn => hunter animation càng chậm
+
+# ================= VIEW / MAP SIZES =================
+# số ô hiển thị (viewport) — giữ nguyên như "như bây giờ"
+VIEW_TILES_X = 16
+VIEW_TILES_Y = 10
+VIEWPORT_W = VIEW_TILES_X * CELL_SIZE
+VIEWPORT_H = VIEW_TILES_Y * CELL_SIZE
+
+# kích thước map thực tế (lớn hơn)
+MAP_COLS = 51  # nên là số lẻ để maze generator ổn; bạn có thể tăng giảm
+MAP_ROWS = 31  # nên là số lẻ
+
+# Camera smoothing factor (0..1). Nhỏ hơn => mượt hơn / trễ hơn
+CAMERA_LERP = 0.07
 
 # =================== MENU ===================
 font_path = asset_path("font/Pixeboy.ttf")
@@ -142,15 +158,11 @@ for fname in enemy_sheet_candidates:
         continue
     surf = pygame.image.load(path).convert_alpha()
     w,h = surf.get_size()
-    # assume frame size 64x64 as player; compute cols/rows from actual size
     cols = max(1, w // 64)
     rows = max(1, h // 64)
-    # require at least 1 row; if rows >= 1 we'll try to extract rows
     if rows >= 1 and cols >= 1:
         try:
-            rows_to_use = min(rows, 4)  # we only need up to 4 directional rows
             frames_by_row = load_spritesheet_rows(path, 64, 64, rows, cols)
-            # map rows to directions: take first 4 rows (if less, duplicate row 0)
             def get_row(i):
                 if i < len(frames_by_row):
                     return frames_by_row[i]
@@ -163,14 +175,11 @@ for fname in enemy_sheet_candidates:
             }
             break
         except Exception:
-            # fallback to single image
             enemy_single = pygame.transform.scale(surf, (CELL_SIZE, CELL_SIZE))
             break
 
-# If not found or failed, fallback to enemy.png single image
 if enemy_animations is None:
     if enemy_single is None:
-        # try load enemy.png as single
         try:
             enemy_single = pygame.transform.scale(pygame.image.load(asset_path("enemy.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE))
         except Exception:
@@ -183,7 +192,6 @@ if enemy_animations is None:
             "right": [enemy_single],
         }
     else:
-        # ultimate fallback: create a colored surface
         surf = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
         surf.fill((0,200,0))
         enemy_animations = {"down":[surf],"up":[surf],"left":[surf],"right":[surf]}
@@ -210,7 +218,7 @@ def load_theme(theme_name):
             bg_img.fill((50, 50, 50))
     return wall_images, bg_img
 
-available_themes = ["sand", "snow", "water", "blue", "brown", "white", "yellow", "ruin"]
+available_themes = ["sand", "snow", "water", "blue", "brown", "white", "yellow"]
 
 floor_img = pygame.transform.scale(pygame.image.load(asset_path("floor.png")).convert(), (CELL_SIZE, CELL_SIZE))
 treasure_img = pygame.transform.scale(pygame.image.load(asset_path("treasure.jpg")).convert(), (CELL_SIZE, CELL_SIZE))
@@ -288,35 +296,57 @@ def dfs(start, goal, maze):
                 stack.append(((nr,nc), path + [(nr,nc)]))
     return []
 
-def draw_path(path, color):
-    for (r, c) in path:
-        rect = pygame.Rect(c*CELL_SIZE+CELL_SIZE//4, r*CELL_SIZE+CELL_SIZE//4,
-                           CELL_SIZE//2, CELL_SIZE//2)
-        pygame.draw.rect(screen, color, rect)
-
-# =================== VẼ ===================
+# =================== VẼ (camera-aware) ===================
 wall_mapping = {}
 
-def draw_maze(maze, goal):
-    for r in range(len(maze)):
-        for c in range(len(maze[0])):
+def clamp(v, a, b):
+    return max(a, min(b, v))
+
+def draw_maze(maze, goal, offset_x, offset_y):
+    rows, cols = len(maze), len(maze[0])
+    # find visible tile range to optimize drawing
+    start_col = max(0, int(offset_x) // CELL_SIZE)
+    end_col = min(cols, (int(offset_x) + VIEWPORT_W) // CELL_SIZE + 2)
+    start_row = max(0, int(offset_y) // CELL_SIZE)
+    end_row = min(rows, (int(offset_y) + VIEWPORT_H) // CELL_SIZE + 2)
+
+    for r in range(start_row, end_row):
+        for c in range(start_col, end_col):
+            screen_x = c*CELL_SIZE - offset_x
+            screen_y = r*CELL_SIZE - offset_y
             if maze[r][c] == 1:
                 if (r, c) not in wall_mapping:
                     wall_mapping[(r, c)] = random.choice(ruin_images) if ruin_images else None
-                screen.blit(bg_ruin_img, (c*CELL_SIZE, r*CELL_SIZE))
+                screen.blit(bg_ruin_img, (screen_x, screen_y))
                 if wall_mapping[(r, c)]:
-                    screen.blit(wall_mapping[(r, c)], (c*CELL_SIZE, r*CELL_SIZE))
+                    screen.blit(wall_mapping[(r, c)], (screen_x, screen_y))
             else:
-                screen.blit(floor_img, (c*CELL_SIZE, r*CELL_SIZE))
-    screen.blit(treasure_img, (goal[1]*CELL_SIZE, goal[0]*CELL_SIZE))
+                screen.blit(floor_img, (screen_x, screen_y))
+    # treasure
+    tr_x = goal[1]*CELL_SIZE - offset_x
+    tr_y = goal[0]*CELL_SIZE - offset_y
+    if -CELL_SIZE <= tr_x <= VIEWPORT_W and -CELL_SIZE <= tr_y <= VIEWPORT_H:
+        screen.blit(treasure_img, (tr_x, tr_y))
 
-def draw_entity(pos, img):
-    screen.blit(img, (pos[1]*CELL_SIZE, pos[0]*CELL_SIZE))
+def draw_entity(pos, img, offset_x, offset_y):
+    x = pos[1]*CELL_SIZE - offset_x
+    y = pos[0]*CELL_SIZE - offset_y
+    screen.blit(img, (x, y))
 
-def draw_player(pos, direction, index):
+def draw_player(pos, direction, index, offset_x, offset_y):
     frames = animations[direction]
     img = frames[index % len(frames)]
-    screen.blit(img, (pos[1]*CELL_SIZE, pos[0]*CELL_SIZE))
+    x = pos[1]*CELL_SIZE - offset_x
+    y = pos[0]*CELL_SIZE - offset_y
+    screen.blit(img, (x, y))
+
+def draw_path(path, color, offset_x, offset_y):
+    for (r, c) in path:
+        sx = c*CELL_SIZE - offset_x + CELL_SIZE//4
+        sy = r*CELL_SIZE - offset_y + CELL_SIZE//4
+        if -CELL_SIZE <= sx <= VIEWPORT_W and -CELL_SIZE <= sy <= VIEWPORT_H:
+            rect = pygame.Rect(sx, sy, CELL_SIZE//2, CELL_SIZE//2)
+            pygame.draw.rect(screen, color, rect)
 
 def draw_button(rect, text, color=(50, 50, 200)):
     pygame.draw.rect(screen, color, rect, border_radius=10)
@@ -324,14 +354,77 @@ def draw_button(rect, text, color=(50, 50, 200)):
     screen.blit(label, (rect.centerx - label.get_width()//2,
                         rect.centery - label.get_height()//2))
 
+# =================== MINI MAP ===================
+def draw_minimap(maze, player_pos, hunter_pos, goal, panel_rect, offset_x, offset_y, map_w_pix, map_h_pix):
+    # dimensions inside panel
+    MINI_W, MINI_H = 120, 120
+    mini_x = panel_rect.x + (panel_rect.width - MINI_W) // 2
+    mini_y = 10
+    rows, cols = len(maze), len(maze[0])
+    # scale from map pixels to minimap pixels
+    sx = MINI_W / map_w_pix
+    sy = MINI_H / map_h_pix
+
+    # background + border
+    pygame.draw.rect(screen, (20,20,20), (mini_x-2, mini_y-2, MINI_W+4, MINI_H+4))
+    pygame.draw.rect(screen, (120,120,120), (mini_x-2, mini_y-2, MINI_W+4, MINI_H+4), 2)
+
+    # draw cells (coarse: map is large so draw by checking 1 cell -> rectangle)
+    # We draw by iterating cells but scaling by CELL_SIZE*sx, CELL_SIZE*sy
+    cell_w = CELL_SIZE * sx
+    cell_h = CELL_SIZE * sy
+    for r in range(rows):
+        for c in range(cols):
+            color = (50,50,50) if maze[r][c] == 1 else (220,220,220)
+            rx = mini_x + c * cell_w
+            ry = mini_y + r * cell_h
+            # skip if outside minimap due to rounding
+            if rx > mini_x + MINI_W or ry > mini_y + MINI_H:
+                continue
+            pygame.draw.rect(screen, color, (rx, ry, cell_w+1, cell_h+1))
+
+    # === Treasure highlight ===
+    pulse = (math.sin(pygame.time.get_ticks() * 0.005) + 1) * 0.5  # dao động 0..1
+    bright = int(200 + 55 * pulse)  # dao động 200..255
+
+    tx = mini_x + goal[1] * CELL_SIZE * sx
+    ty = mini_y + goal[0] * CELL_SIZE * sy
+
+    # Kích thước cố định để dễ thấy (ít nhất 6x6)
+    tre_w = max(6, cell_w)
+    tre_h = max(6, cell_h)
+
+    # Viền đỏ để nổi bật
+    pygame.draw.rect(screen, (255, 0, 0), (tx-2, ty-2, tre_w+4, tre_h+4))
+
+    # Treasure vàng nhấp nháy
+    pygame.draw.rect(screen, (bright, bright, 0), (tx, ty, tre_w, tre_h))
+
+    # player
+    px = mini_x + player_pos[1] * CELL_SIZE * sx
+    py = mini_y + player_pos[0] * CELL_SIZE * sy
+    pygame.draw.rect(screen, (50,150,255), (px, py, max(3, cell_w), max(3, cell_h)))
+
+    # hunter
+    hx = mini_x + hunter_pos[1] * CELL_SIZE * sx
+    hy = mini_y + hunter_pos[0] * CELL_SIZE * sy
+    pygame.draw.rect(screen, (200,50,50), (hx, hy, max(3, cell_w), max(3, cell_h)))
+
+    # draw viewport rectangle on minimap
+    view_rx = mini_x + (offset_x) * sx
+    view_ry = mini_y + (offset_y) * sy
+    view_rw = VIEWPORT_W * sx
+    view_rh = VIEWPORT_H * sy
+    pygame.draw.rect(screen, (0,200,0), (view_rx, view_ry, view_rw, view_rh), 2)
+
 # =================== CONTROL PANEL ===================
-def draw_control_panel(WIDTH, HEIGHT, paused):
+def draw_control_panel(view_w, view_h, paused):
     panel_w = 160
-    panel_rect = pygame.Rect(WIDTH, 0, panel_w, HEIGHT)
+    panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
     btn_w, btn_h, gap = 120, 50, 20
-    x = WIDTH + 20
-    y = 40
+    x = view_w + 20
+    y = 160
     buttons = {}
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)
@@ -350,6 +443,25 @@ def draw_control_panel(WIDTH, HEIGHT, paused):
     draw_button(surrender_btn, "Surrender", (200, 60, 60))
     buttons["surrender"] = surrender_btn
     return buttons, panel_w
+
+def get_control_buttons(paused):
+    btn_w, btn_h, gap = 120, 50, 20
+    x = VIEWPORT_W + 20
+    y = 160
+    buttons = {}
+    if not paused:
+        pause_btn = pygame.Rect(x, y, btn_w, btn_h)
+        buttons["pause"] = pause_btn
+    else:
+        cont_btn = pygame.Rect(x, y, btn_w, btn_h)
+        buttons["continue"] = cont_btn
+    y += btn_h + gap
+    reset_btn = pygame.Rect(x, y, btn_w, btn_h)
+    buttons["reset"] = reset_btn
+    y += btn_h + gap
+    surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
+    buttons["surrender"] = surrender_btn
+    return buttons
 
 # =================== LOADING / TRANSITION / END SCREENS ===================
 def loading_screen():
@@ -414,7 +526,7 @@ def end_screen(result):
 # =================== GAME LOOP ===================
 def game_loop(mode="bfs"):
     global screen, hunter_timer, wall_mapping, ruin_images, bg_ruin_img
-
+    hunter_timer = 0
     # reset mapping mỗi màn
     wall_mapping = {}
 
@@ -426,13 +538,16 @@ def game_loop(mode="bfs"):
     hunter_dir = "down"
     hunter_frame_index = 0
     hunter_frame_timer = 0
-    hunter_frame_speed = 1  # nhỏ hơn => frame change nhanh hơn
 
-    maze = generate_maze(16, 10)
+    # tạo map lớn hơn nhưng viewport cố định
+    maze = generate_maze(MAP_COLS, MAP_ROWS)
     ROWS, COLS = len(maze), len(maze[0])
-    WIDTH, HEIGHT = COLS*CELL_SIZE, ROWS*CELL_SIZE
+    MAP_W_PIX = COLS * CELL_SIZE
+    MAP_H_PIX = ROWS * CELL_SIZE
+
+    # màn hình = viewport + panel
     panel_w = 160
-    screen = pygame.display.set_mode((WIDTH + panel_w, HEIGHT))
+    screen = pygame.display.set_mode((VIEWPORT_W + panel_w, VIEWPORT_H))
 
     start, goal = (1,1), farthest_cell(maze, (1,1))
     player_pos = list(start)
@@ -448,101 +563,138 @@ def game_loop(mode="bfs"):
                     break
 
     path, running, paused = [], True, False
+
+    # initial camera offsets (center on player if possible)
+    # offset variables are floats now for smooth lerp
+    offset_x = float(clamp(player_pos[1]*CELL_SIZE - VIEWPORT_W//2, 0, max(0, MAP_W_PIX - VIEWPORT_W)))
+    offset_y = float(clamp(player_pos[0]*CELL_SIZE - VIEWPORT_H//2, 0, max(0, MAP_H_PIX - VIEWPORT_H)))
+
+    # target offsets that camera will interpolate towards
+    target_off_x = offset_x
+    target_off_y = offset_y
+
     while running:
-        screen.fill((10,0,0))
-        draw_maze(maze, goal)
+        # Compute button rects first
+        buttons = get_control_buttons(paused)
 
-        if path:
-            color = (0,255,255) if mode=="bfs" else (255,128,0)
-            draw_path(path, color)
-
-        # draw player
-        draw_player(player_pos, player_dir, frame_index)
-
-        # draw hunter using per-direction frames
-        hunter_frames = enemy_animations.get(hunter_dir, enemy_animations["down"])
-        hunter_img = hunter_frames[hunter_frame_index % len(hunter_frames)]
-        draw_entity(hunter_pos, hunter_img)
-
-        buttons, panel_w = draw_control_panel(WIDTH, HEIGHT, paused)
-        pygame.display.flip()
-        clock.tick(10)
-
+        # ---- handle events first (for responsive UI) ----
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: running = False
+            if event.type == pygame.QUIT:
+                running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if buttons["reset"].collidepoint(event.pos): return "reset"
-                elif "pause" in buttons and buttons["pause"].collidepoint(event.pos): paused = True
-                elif "continue" in buttons and buttons["continue"].collidepoint(event.pos): paused = False
-                elif buttons["surrender"].collidepoint(event.pos): return "exit"
-        if paused: continue
+                if buttons.get("reset") and buttons["reset"].collidepoint(event.pos):
+                    return "reset"
+                elif "pause" in buttons and buttons["pause"].collidepoint(event.pos):
+                    paused = True
+                elif "continue" in buttons and buttons["continue"].collidepoint(event.pos):
+                    paused = False
+                elif buttons.get("surrender") and buttons["surrender"].collidepoint(event.pos):
+                    return "exit"
+
+        # fill background for viewport
+        screen.fill((10,0,0), rect=pygame.Rect(0,0,VIEWPORT_W, VIEWPORT_H))
 
         # ==== player input ====
         keys = pygame.key.get_pressed()
         nr, nc = player_pos
         moved = False
-        if keys[pygame.K_UP]:
-            nr -= 1; player_dir = "up"; moved = True
-        elif keys[pygame.K_DOWN]:
-            nr += 1; player_dir = "down"; moved = True
-        elif keys[pygame.K_LEFT]:
-            nc -= 1; player_dir = "left"; moved = True
-        elif keys[pygame.K_RIGHT]:
-            nc += 1; player_dir = "right"; moved = True
-        if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
-            player_pos = [nr, nc]
+        if not paused:
+            if keys[pygame.K_UP]:
+                nr -= 1; player_dir = "up"; moved = True
+            elif keys[pygame.K_DOWN]:
+                nr += 1; player_dir = "down"; moved = True
+            elif keys[pygame.K_LEFT]:
+                nc -= 1; player_dir = "left"; moved = True
+            elif keys[pygame.K_RIGHT]:
+                nc += 1; player_dir = "right"; moved = True
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                player_pos = [nr, nc]
+                # update camera target (not immediate offset)
+                target_off_x = clamp(player_pos[1]*CELL_SIZE - VIEWPORT_W//2 + CELL_SIZE//2, 0, max(0, MAP_W_PIX - VIEWPORT_W))
+                target_off_y = clamp(player_pos[0]*CELL_SIZE - VIEWPORT_H//2 + CELL_SIZE//2, 0, max(0, MAP_H_PIX - VIEWPORT_H))
 
         # player animation
         if moved:
             frame_timer += 1
-            if frame_timer >= 2:
+            if frame_timer >= player_speed:
                 frame_index = (frame_index + 1) % len(animations[player_dir])
                 frame_timer = 0
         else:
             frame_timer += 1
-            if frame_timer >= 8:
+            if frame_timer >= player_speed * 4:
                 frame_index = (frame_index + 1) % len(animations[player_dir])
                 frame_timer = 0
 
+        # ==== smooth camera update (lerp towards target_off) ====
+        # move offset_x/offset_y towards target_off_x/target_off_y
+        offset_x += (target_off_x - offset_x) * CAMERA_LERP
+        offset_y += (target_off_y - offset_y) * CAMERA_LERP
+
+        # draw maze region (camera-aware)
+        draw_maze(maze, goal, offset_x, offset_y)
+
         # ==== hunter pathfinding & movement + animation ====
-        hunter_timer += 1
-        if hunter_timer >= hunter_speed:
-            if not path or path[-1] != tuple(player_pos):
-                path = bfs(tuple(hunter_pos), tuple(player_pos), maze) if mode=="bfs" else dfs(tuple(hunter_pos), tuple(player_pos), maze)
+        if not paused:
+            hunter_timer += 1
+            if hunter_timer >= hunter_speed:
+                if not path or path[-1] != tuple(player_pos):
+                    path = bfs(tuple(hunter_pos), tuple(player_pos), maze) if mode=="bfs" else dfs(tuple(hunter_pos), tuple(player_pos), maze)
 
-            moved_hunter = False
-            if len(path) > 1:
-                prev = tuple(hunter_pos)
-                nxt = path[1]
-                dr = nxt[0] - prev[0]
-                dc = nxt[1] - prev[1]
-                # set hunter_dir based on movement vector
-                if abs(dc) > abs(dr):
-                    hunter_dir = "right" if dc > 0 else "left"
+                moved_hunter = False
+                if len(path) > 1:
+                    prev = tuple(hunter_pos)
+                    nxt = path[1]
+                    dr = nxt[0] - prev[0]
+                    dc = nxt[1] - prev[1]
+                    # set hunter_dir based on movement vector
+                    if abs(dc) > abs(dr):
+                        hunter_dir = "right" if dc > 0 else "left"
+                    else:
+                        hunter_dir = "down" if dr > 0 else "up"
+
+                    hunter_pos = list(nxt)
+                    path = path[1:]
+                    moved_hunter = True
+
+                # animate hunter
+                if moved_hunter:
+                    hunter_frame_timer += 1
+                    if hunter_frame_timer >= hunter_anim_speed:
+                        hunter_frame_index = (hunter_frame_index + 1) % len(enemy_animations[hunter_dir])
+                        hunter_frame_timer = 0
                 else:
-                    hunter_dir = "down" if dr > 0 else "up"
+                    hunter_frame_timer += 1
+                    if hunter_frame_timer >= hunter_anim_speed * 6:
+                        hunter_frame_index = (hunter_frame_index + 1) % len(enemy_animations[hunter_dir])
+                        hunter_frame_timer = 0
 
-                hunter_pos = list(nxt)
-                path = path[1:]
-                moved_hunter = True
+                hunter_timer = 0
 
-            # animate hunter
-            if moved_hunter:
-                hunter_frame_timer += 1
-                if hunter_frame_timer >= hunter_frame_speed:
-                    hunter_frame_index = (hunter_frame_index + 1) % len(enemy_animations[hunter_dir])
-                    hunter_frame_timer = 0
-            else:
-                # idle: vẫn có thể lật chậm frame nếu muốn
-                hunter_frame_timer += 1
-                if hunter_frame_timer >= hunter_frame_speed * 6:
-                    hunter_frame_index = (hunter_frame_index + 1) % len(enemy_animations[hunter_dir])
-                    hunter_frame_timer = 0
+        # draw path (on top of maze)
+        if path:
+            color = (0,255,255) if mode=="bfs" else (255,128,0)
+            draw_path(path, color, offset_x, offset_y)
 
-            hunter_timer = 0
+        # draw player & hunter (camera-aware)
+        draw_player(player_pos, player_dir, frame_index, offset_x, offset_y)
+        hunter_frames = enemy_animations.get(hunter_dir, enemy_animations["down"])
+        hunter_img = hunter_frames[hunter_frame_index % len(hunter_frames)]
+        draw_entity(hunter_pos, hunter_img, offset_x, offset_y)
 
-        if tuple(player_pos) == tuple(hunter_pos): return "lose"
-        if tuple(player_pos) == goal: return "win"
+        # draw panel and buttons
+        _, panel_w = draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused)
+        panel_rect = pygame.Rect(VIEWPORT_W, 0, panel_w, VIEWPORT_H)
+
+        # draw minimap on panel
+        draw_minimap(maze, player_pos, hunter_pos, goal, panel_rect, offset_x, offset_y, MAP_W_PIX, MAP_H_PIX)
+
+        pygame.display.flip()
+        clock.tick(30)
+
+        # collision / win checks (positions in tile coords)
+        if not paused:
+            if tuple(player_pos) == tuple(hunter_pos): return "lose"
+            if tuple(player_pos) == goal: return "win"
     return "exit"
 
 # =================== MAIN ===================
