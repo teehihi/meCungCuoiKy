@@ -7,11 +7,16 @@ from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
     asset_path, available_themes
 )
+from PIL import Image, ImageFilter
+import numpy as np
+
 from background import ScrollingBackground 
 from constants import CELL_SIZE, VIEWPORT_W, VIEWPORT_H, path_tile
 
+
 # Khởi tạo Pygame và màn hình ban đầu
 pygame.init()
+pygame.mixer.init()
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 screen = pygame.display.set_mode((1, 1))
 
@@ -21,7 +26,7 @@ font = pygame.font.SysFont("Segoe UI", 22)
 big_font = pygame.font.SysFont("Segoe UI", 48, bold=True)
 menu_font = pygame.font.Font(font_path, 80)
 floor_img = pygame.transform.scale(pygame.image.load(asset_path("floor.png")).convert(), (CELL_SIZE, CELL_SIZE))
-treasure_img = pygame.transform.scale(pygame.image.load(asset_path("treasure.jpg")).convert(), (CELL_SIZE, CELL_SIZE))
+treasure_img = pygame.transform.scale(pygame.image.load(asset_path("treasure.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE))
 clock = pygame.time.Clock()
 path_tile = pygame.image.load(asset_path("path.png")).convert_alpha()
 path_tile = pygame.transform.scale(path_tile, (CELL_SIZE, CELL_SIZE))
@@ -295,39 +300,109 @@ def loading_screen():
         if progress >= 1: break
 
 def transition_screen(text, color=(0,200,0)):
-    screen.fill((0,0,0))
-    label = big_font.render(text, True, color)
-    screen.blit(label, (100, 150))
-    info = font.render("Nhấn SPACE để tiếp tục...", True, (200,200,200))
-    screen.blit(info, (120, 250))
-    pygame.display.flip()
+    screen_w, screen_h = screen.get_size()
+
+    # Tạo background cuộn
+    try:
+        bg = ScrollingBackground(asset_path("background.png"), screen_h, speed=1)
+    except Exception:
+        bg = None
+
     waiting = True
     while waiting:
+        # Vẽ background động hoặc fallback
+        if bg:
+            bg.draw(screen)
+        else:
+            screen.fill((30, 30, 30))
+
+        # Overlay làm tối nền
+        overlay = pygame.Surface((screen_w, screen_h))
+        overlay.set_alpha(120)  # độ mờ (0 = trong suốt, 255 = đen đặc)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+
+        # ----- Text chính -----
+        label = big_font.render(text, True, color)
+        label_rect = label.get_rect(center=(screen_w // 2, screen_h // 2 - 50))
+        screen.blit(label, label_rect)
+
+        # ----- Info -----
+        info = font.render("Nhấn SPACE để tiếp tục...", True, (200,200,200))
+        info_rect = info.get_rect(center=(screen_w // 2, screen_h // 2 + 50))
+        screen.blit(info, info_rect)
+
+        pygame.display.flip()
+
+        # Xử lý sự kiện
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: return "exit"
+            if event.type == pygame.QUIT:
+                return "exit"
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 waiting = False
+
         clock.tick(30)
+
     return "next"
 
+
+def blur_surface(surface, radius=5):
+    arr = pygame.surfarray.array3d(surface)
+    img = Image.fromarray(np.transpose(arr, (1, 0, 2)))  # đổi trục (x,y)
+    img = img.filter(ImageFilter.GaussianBlur(radius=radius))  # làm mờ
+    arr = np.transpose(np.array(img), (1, 0, 2))  # đổi lại
+    return pygame.surfarray.make_surface(arr)
+
 def end_screen(result):
-    screen.fill((30,30,30))
-    label = big_font.render("Bạn đã thua!" if result=="lose" else "Bạn đã thắng!",
-                            True, (200,50,50) if result=="lose" else (50,200,50))
-    screen.blit(label, (100, 150))
-    retry_btn = pygame.Rect(120, 250, 120, 50)
-    exit_btn = pygame.Rect(260, 250, 120, 50)
-    draw_button(retry_btn, "Retry", (50,150,200))
-    draw_button(exit_btn, "Exit", (200,50,50))
+    global screen, clock, big_font
+
+    screen_w, screen_h = screen.get_size()
+
+    snapshot = screen.copy()
+    blurred = blur_surface(snapshot, radius=8)
+    screen.blit(blurred, (0, 0))
+
+    # ----- Label -----
+    text = "GAME OVER" if result == "lose" else "Bạn đã thắng!"
+
+    color = (0, 150, 0) if result == "lose" else (180, 0, 0)
+    label = menu_font.render(text, True, color)
+    label_rect = label.get_rect(center=(screen_w // 2, screen_h // 2 - 60))
+    screen.blit(label, label_rect)
+
+    # ----- Buttons -----
+    button_width, button_height = 120, 50
+    spacing = 20
+    total_width = button_width * 2 + spacing
+    start_x = (screen_w - total_width) // 2
+    y = screen_h // 2 + 20
+
+    retry_btn = pygame.Rect(start_x, y, button_width, button_height)
+    exit_btn = pygame.Rect(start_x + button_width + spacing, y, button_width, button_height)
+
+    draw_button(retry_btn, "Retry", (50, 150, 200))
+    draw_button(exit_btn, "Exit", (200, 50, 50))
+
     pygame.display.flip()
+
+    # ----- Vòng lặp sự kiện -----
     while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: return "exit"
+            if event.type == pygame.QUIT:
+                pygame.mixer.music.stop()
+                return "exit"
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if retry_btn.collidepoint(event.pos): return "retry"
-                elif exit_btn.collidepoint(event.pos): return "exit"
+                if retry_btn.collidepoint(event.pos):
+                    pygame.mixer.music.stop()
+                    pygame.mixer.stop()
+                    return "retry"
+                elif exit_btn.collidepoint(event.pos):
+                    pygame.mixer.music.stop()
+                    pygame.mixer.stop()
+                    return "exit"
         clock.tick(30)
-        
+
+  
 def draw_minimap(maze, player_pos, hunter_pos, goal, panel_rect, offset_x, offset_y, map_w_pix, map_h_pix):
     MINI_W, MINI_H = 120, 120
     mini_x = panel_rect.x + (panel_rect.width - MINI_W) // 2
