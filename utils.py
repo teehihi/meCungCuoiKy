@@ -135,30 +135,123 @@ def draw_button(rect, text, color=(50, 50, 200)):
     screen.blit(label, (rect.centerx - label.get_width()//2,
                         rect.centery - label.get_height()//2))
 
+# def draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img):
+#     rows, cols = len(maze), len(maze[0])
+#     start_col = max(0, int(offset_x) // CELL_SIZE)
+#     end_col = min(cols, (int(offset_x) + VIEWPORT_W) // CELL_SIZE + 2)
+#     start_row = max(0, int(offset_y) // CELL_SIZE)
+#     end_row = min(rows, (int(offset_y) + VIEWPORT_H) // CELL_SIZE + 2)
+
+#     for r in range(start_row, end_row):
+#         for c in range(start_col, end_col):
+#             screen_x = c*CELL_SIZE - offset_x
+#             screen_y = r*CELL_SIZE - offset_y
+#             if maze[r][c] == 1:
+#                 if (r, c) not in wall_mapping:
+#                     wall_mapping[(r, c)] = random.choice(ruin_images) if ruin_images else None
+#                 screen.blit(bg_ruin_img, (screen_x, screen_y))
+#                 if wall_mapping[(r, c)]:
+#                     screen.blit(wall_mapping[(r, c)], (screen_x, screen_y))
+#             else:
+#                 screen.blit(floor_img, (screen_x, screen_y))
+#     tr_x = goal[1]*CELL_SIZE - offset_x
+#     tr_y = goal[0]*CELL_SIZE - offset_y
+#     if -CELL_SIZE <= tr_x <= VIEWPORT_W and -CELL_SIZE <= tr_y <= VIEWPORT_H:
+#         screen.blit(treasure_img, (tr_x, tr_y))
+import pygame
+import os
+import random
+import math
+from collections import deque
+from constants import (
+    CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
+    asset_path, available_themes
+)
+from PIL import Image, ImageFilter
+import numpy as np
+
+# Giả sử các file road đã được tải và gán vào biến
+road_images = {
+    "road_1": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_1.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_2": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_2.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_3": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_3.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_4": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_4.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_5": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_5.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_6": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_6.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_7": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_7.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_8": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_8.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+    "road_9": pygame.transform.scale(pygame.image.load(os.path.join(asset_path("road"), "road_9.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE)),
+}
+# Tạo các phiên bản lật cho hình ảnh
+road_images["road_9_flipped"] = pygame.transform.flip(road_images["road_9"], True, False)
+
+
 def draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img):
     rows, cols = len(maze), len(maze[0])
-    start_col = max(0, int(offset_x) // CELL_SIZE)
+    start_col = max(0, int(offset_x) // CELL_SIZE - 1)
     end_col = min(cols, (int(offset_x) + VIEWPORT_W) // CELL_SIZE + 2)
-    start_row = max(0, int(offset_y) // CELL_SIZE)
+    start_row = max(0, int(offset_y) // CELL_SIZE - 1)
     end_row = min(rows, (int(offset_y) + VIEWPORT_H) // CELL_SIZE + 2)
 
+    # First Pass: Draw all road tiles and background
     for r in range(start_row, end_row):
         for c in range(start_col, end_col):
-            screen_x = c*CELL_SIZE - offset_x
-            screen_y = r*CELL_SIZE - offset_y
-            if maze[r][c] == 1:
+            screen_x = c * CELL_SIZE - offset_x
+            screen_y = r * CELL_SIZE - offset_y
+
+            is_wall = maze[r][c] == 1
+            
+            # Draw the background
+            screen.blit(bg_ruin_img, (screen_x, screen_y))
+
+            if not is_wall:
+                # This is a road tile, so we draw the path
+                has_wall_up = r > 0 and maze[r-1][c] == 1
+                has_wall_down = r < rows - 1 and maze[r+1][c] == 1
+                has_wall_left = c > 0 and maze[r][c-1] == 1
+                has_wall_right = c < cols - 1 and maze[r][c+1] == 1
+                has_wall_down_left = r < rows - 1 and c > 0 and maze[r+1][c-1] == 1
+                has_wall_down_right = r < rows - 1 and c < cols - 1 and maze[r+1][c+1] == 1
+
+                if has_wall_up and has_wall_left:
+                    screen.blit(road_images["road_1"], (screen_x, screen_y))
+                elif has_wall_up and has_wall_right:
+                    screen.blit(road_images["road_3"], (screen_x, screen_y))
+                elif has_wall_up:
+                    screen.blit(road_images["road_2"], (screen_x, screen_y))
+                elif has_wall_left:
+                    screen.blit(road_images["road_4"], (screen_x, screen_y))
+                elif has_wall_right:
+                    screen.blit(road_images["road_6"], (screen_x, screen_y))
+                elif has_wall_down and has_wall_left:
+                    screen.blit(road_images["road_7"], (screen_x, screen_y))
+                elif has_wall_down and has_wall_right:
+                    screen.blit(road_images["road_9"], (screen_x, screen_y))
+                elif has_wall_down:
+                    screen.blit(road_images["road_8"], (screen_x, screen_y))
+                else:
+                    screen.blit(road_images["road_5"], (screen_x, screen_y))
+
+    # Second Pass: Draw all wall tiles on top of the road
+    for r in range(start_row, end_row):
+        for c in range(start_col, end_col):
+            screen_x = c * CELL_SIZE - offset_x
+            screen_y = r * CELL_SIZE - offset_y
+
+            is_wall = maze[r][c] == 1
+            
+            if is_wall:
                 if (r, c) not in wall_mapping:
                     wall_mapping[(r, c)] = random.choice(ruin_images) if ruin_images else None
-                screen.blit(bg_ruin_img, (screen_x, screen_y))
                 if wall_mapping[(r, c)]:
                     screen.blit(wall_mapping[(r, c)], (screen_x, screen_y))
-            else:
-                screen.blit(floor_img, (screen_x, screen_y))
-    tr_x = goal[1]*CELL_SIZE - offset_x
-    tr_y = goal[0]*CELL_SIZE - offset_y
+                    
+    # Draw treasure
+    tr_x = goal[1] * CELL_SIZE - offset_x
+    tr_y = goal[0] * CELL_SIZE - offset_y
     if -CELL_SIZE <= tr_x <= VIEWPORT_W and -CELL_SIZE <= tr_y <= VIEWPORT_H:
         screen.blit(treasure_img, (tr_x, tr_y))
-
+        
 def draw_entity(pos, img, offset_x, offset_y):
     x = pos[1]*CELL_SIZE - offset_x
     y = pos[0]*CELL_SIZE - offset_y
