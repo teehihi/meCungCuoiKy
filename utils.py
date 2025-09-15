@@ -129,11 +129,13 @@ def farthest_cell(maze, start):
 def clamp(v, a, b):
     return max(a, min(b, v))
 
-def draw_button(rect, text, color=(50, 50, 200)):
+button_font = pygame.font.Font(font_path, 22)
+
+def draw_button(rect, text, color):
     pygame.draw.rect(screen, color, rect, border_radius=10)
-    label = font.render(text, True, (255, 255, 255))
-    screen.blit(label, (rect.centerx - label.get_width()//2,
-                        rect.centery - label.get_height()//2))
+    label = button_font.render(text, True, (255, 255, 255))
+    screen.blit(label, (rect.centerx - label.get_width() // 2,
+                        rect.centery - label.get_height() // 2))
 
 # def draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img):
 #     rows, cols = len(maze), len(maze[0])
@@ -251,7 +253,7 @@ def draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin
     tr_y = goal[0] * CELL_SIZE - offset_y
     if -CELL_SIZE <= tr_x <= VIEWPORT_W and -CELL_SIZE <= tr_y <= VIEWPORT_H:
         screen.blit(treasure_img, (tr_x, tr_y))
-        
+       
 def draw_entity(pos, img, offset_x, offset_y):
     x = pos[1]*CELL_SIZE - offset_x
     y = pos[0]*CELL_SIZE - offset_y
@@ -272,30 +274,41 @@ def draw_path(screen, path, offset_x, offset_y):
         y = r * CELL_SIZE - offset_y
         screen.blit(path_tile, (x, y))
 
+# Tạo font riêng cho control panel
+control_font = pygame.font.Font(font_path, 22)  # chỉnh cỡ chữ theo ý bạn
+
 def draw_control_panel(view_w, view_h, paused):
     panel_w = 160
     panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
+
     btn_w, btn_h, gap = 120, 50, 20
     x = view_w + 20
     y = 160
     buttons = {}
+
+    # Pause / Continue
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)
-        draw_button(pause_btn, "Pause", (80, 80, 200))
+        draw_control_button(pause_btn, "Pause", (80, 80, 200))
         buttons["pause"] = pause_btn
     else:
         cont_btn = pygame.Rect(x, y, btn_w, btn_h)
-        draw_button(cont_btn, "Continue", (50, 180, 100))
+        draw_control_button(cont_btn, "Continue", (50, 180, 100))
         buttons["continue"] = cont_btn
     y += btn_h + gap
+
+    # Reset
     reset_btn = pygame.Rect(x, y, btn_w, btn_h)
-    draw_button(reset_btn, "Reset", (200, 150, 50))
+    draw_control_button(reset_btn, "Reset", (200, 150, 50))
     buttons["reset"] = reset_btn
     y += btn_h + gap
+
+    # Surrender
     surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
-    draw_button(surrender_btn, "Surrender", (200, 60, 60))
+    draw_control_button(surrender_btn, "Surrender", (200, 60, 60))
     buttons["surrender"] = surrender_btn
+
     return buttons, panel_w
 
 def get_control_buttons(paused):
@@ -310,12 +323,21 @@ def get_control_buttons(paused):
         cont_btn = pygame.Rect(x, y, btn_w, btn_h)
         buttons["continue"] = cont_btn
     y += btn_h + gap
+
     reset_btn = pygame.Rect(x, y, btn_w, btn_h)
     buttons["reset"] = reset_btn
     y += btn_h + gap
+
     surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
     buttons["surrender"] = surrender_btn
+
     return buttons
+
+def draw_control_button(rect, text, color):
+    pygame.draw.rect(screen, color, rect, border_radius=10)
+    label = control_font.render(text, True, (255, 255, 255))
+    screen.blit(label, (rect.centerx - label.get_width() // 2,
+                        rect.centery - label.get_height() // 2))
 
 # Các hàm UI cho menu và màn hình chuyển tiếp
 def main_menu():
@@ -373,24 +395,71 @@ def main_menu():
 
 def loading_screen():
     screen = pygame.display.set_mode((600, 400))
-    progress, tip_text = 0, random.choice([
+
+    # Font: Title dùng font riêng của bạn, còn lại Segoe UI
+    title_font = pygame.font.Font(font_path, 40)  
+    tip_font = pygame.font.SysFont("segoeui", 22, bold = True)
+    bar_font = pygame.font.SysFont("segoeui", 20)
+
+    # Load ảnh nền, scale theo chiều cao (400)
+    bg_img = pygame.image.load(asset_path("background.png")).convert()
+    bg_width, bg_height = bg_img.get_size()
+    scale_factor = 400 / bg_height
+    bg_width_scaled = int(bg_width * scale_factor)
+    bg_img = pygame.transform.scale(bg_img, (bg_width_scaled, 400))
+
+    scroll_x = 0
+    speed = 0.3  # chậm lại cho mượt
+
+    progress = 0
+    tip_text = random.choice([
         "Mẹo: Hunter luôn đuổi theo bạn!",
         "Mẹo: Dùng phím mũi tên để di chuyển.",
         "Mỗi màn có bản đồ khác nhau.",
     ])
-    while True:
-        screen.fill((20, 20, 20))
-        title = font.render("Loading Maze Hunter...", True, (255, 255, 255))
-        screen.blit(title, (180, 120))
+
+    running = True
+    while running:
+        # Vẽ background cuộn ngang
+        scroll_x -= speed
+        if scroll_x <= -bg_width_scaled:
+            scroll_x = 0
+
+        screen.blit(bg_img, (scroll_x, 0))
+        screen.blit(bg_img, (scroll_x + bg_width_scaled, 0))
+
+        # Overlay làm mờ
+        overlay = pygame.Surface((600, 400))
+        overlay.set_alpha(120)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+
+        # Title (font riêng của bạn, màu vàng sáng)
+        title = title_font.render("Loading Maze Hunter...", True, (255, 215, 0))
+        screen.blit(title, (300 - title.get_width() // 2, 100))
+
+        # Thanh progress
         bar_w, bar_h, bar_x, bar_y = 400, 30, 100, 200
-        pygame.draw.rect(screen, (255,255,255), (bar_x, bar_y, bar_w, bar_h), 2)
-        pygame.draw.rect(screen, (0,200,0), (bar_x+2, bar_y+2, int(progress*(bar_w-4)), bar_h-4))
-        hint = font.render(tip_text, True, (200,200,200))
-        screen.blit(hint, (120, 260))
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 3)
+        pygame.draw.rect(
+            screen, (50, 255, 120),  # xanh neon
+            (bar_x + 3, bar_y + 3, int(progress * (bar_w - 6)), bar_h - 6)
+        )
+        bar_label = bar_font.render(f"{int(progress*100)}%", True, (255, 255, 0))
+        screen.blit(bar_label, (300 - bar_label.get_width() // 2, bar_y + bar_h + 10))
+
+        # Hint text (Segoe UI, vàng nhạt)
+        hint = tip_font.render(tip_text, True, (255, 220, 100))
+        screen.blit(hint, (300 - hint.get_width() // 2, 280))
+
         pygame.display.flip()
         clock.tick(60)
-        progress += 0.01
-        if progress >= 1: break
+
+        # Tăng tiến độ
+        progress += 0.004
+        if progress >= 1:
+            running = False
+
 
 def transition_screen(text, color=(0,200,0)):
     screen_w, screen_h = screen.get_size()
@@ -458,7 +527,7 @@ def end_screen(result):
     # ----- Label -----
     text = "GAME OVER" if result == "lose" else "Bạn đã thắng!"
 
-    color = (0, 150, 0) if result == "lose" else (180, 0, 0)
+    color = (255, 215, 0) if result == "lose" else (180, 0, 0)
     label = menu_font.render(text, True, color)
     label_rect = label.get_rect(center=(screen_w // 2, screen_h // 2 - 60))
     screen.blit(label, label_rect)
