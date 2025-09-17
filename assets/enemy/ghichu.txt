@@ -1,0 +1,5 @@
+Các enemy cần đổi:
+- run_brown
+- run_snow
+- run_water
+- run_yellow

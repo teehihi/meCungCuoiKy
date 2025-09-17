@@ -7,9 +7,9 @@ sprite_rows, sprite_cols = 4, 8
 player_frames = load_spritesheet_rows(asset_path("player_run.png"), 64, 64, sprite_rows, sprite_cols)
 player_animations = {
     "down": player_frames[0],
-    "up": player_frames[1],
-    "left": player_frames[2],
-    "right": player_frames[3],
+    "left": player_frames[1],
+    "right": player_frames[2],
+    "up": player_frames[3],
 }
 
 class Player:
