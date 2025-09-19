@@ -2,6 +2,7 @@ import pygame
 import os
 import random
 import math
+from pathfinding import bfs, dfs, greedy, astar
 from collections import deque
 from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
@@ -256,59 +257,84 @@ def draw_control_button(rect, text, color):
     screen.blit(label, (rect.centerx - label.get_width() // 2,
                         rect.centery - label.get_height() // 2))
 
-# Các hàm UI cho menu và màn hình chuyển tiếp
 def main_menu():
-    screen = pygame.display.set_mode((600, 400))
+    screen_w, screen_h = 800, 600
+    screen = pygame.display.set_mode((screen_w, screen_h))
     try:
-        bg = ScrollingBackground(asset_path("background.png"), 400, speed=1)
+        bg = ScrollingBackground(asset_path("background.png"), 600, speed = 1)
     except Exception:
         bg = None
 
+    button_font = pygame.font.Font(font_path, 28)
+
+    def draw_menu_button(text, x, y, w, h, color, hover_color, text_color=(255,255,255)):
+        rect = pygame.Rect(x, y, w, h)
+        mouse_pos = pygame.mouse.get_pos()
+        if rect.collidepoint(mouse_pos):
+            pygame.draw.rect(screen, hover_color, rect, border_radius=10)
+        else:
+            pygame.draw.rect(screen, color, rect, border_radius=10)
+        label = button_font.render(text, True, text_color)
+        screen.blit(label, (x + (w - label.get_width()) // 2,
+                            y + (h - label.get_height()) // 2))
+        return rect
+
+    MENU_W = screen_w
+    BUTTON_W = 200
+    BUTTON_H = 50
+    GAP = 40
+
+    # tọa độ căn 2 nút trên 1 hàng
+    left_x  = (MENU_W - (BUTTON_W * 2 + GAP)) // 2
+    right_x = left_x + BUTTON_W + GAP
+
+    y1 = 200
+    y2 = 280
+    y_exit = 380
+
     while True:
+        # vẽ background
         if bg:
             bg.draw(screen)
-            overlay = pygame.Surface((600, 400))
+            overlay = pygame.Surface((screen_w, screen_h))
             overlay.set_alpha(120)
             overlay.fill((0, 0, 0))
             screen.blit(overlay, (0, 0))
         else:
             screen.fill((30, 30, 40))
 
+        # Title
         title_text = "Maze Hunter"
         title_color = (255, 215, 0)
         title = menu_font.render(title_text, True, title_color)
-        screen.blit(title, (300 - title.get_width()//2, 80))
+        screen.blit(title, (screen_w // 2 - title.get_width() // 2, 80))
 
-        button_font = pygame.font.Font(font_path, 28)
-        def draw_menu_button(text, x, y, w, h, color, hover_color, text_color=(255,255,255)):
-            rect = pygame.Rect(x, y, w, h)
-            mouse_pos = pygame.mouse.get_pos()
-            if rect.collidepoint(mouse_pos):
-                pygame.draw.rect(screen, hover_color, rect, border_radius=10)
-            else:
-                pygame.draw.rect(screen, color, rect, border_radius=10)
-            label = button_font.render(text, True, text_color)
-            screen.blit(label, (x + (w - label.get_width()) // 2,
-                                y + (h - label.get_height()) // 2))
-            return rect
+        # Buttons
+        bfs_btn    = draw_menu_button("PLAY BFS MODE", left_x,  y1, BUTTON_W, BUTTON_H, (70,130,180), (100,160,220))
+        dfs_btn    = draw_menu_button("PLAY DFS MODE", right_x, y1, BUTTON_W, BUTTON_H, (34,139,34),  (60,179,60))
+        greedy_btn = draw_menu_button("PLAY GREEDY",   left_x,  y2, BUTTON_W, BUTTON_H, (218,165,32), (238,201,0))
+        astar_btn  = draw_menu_button("PLAY A* MODE",  right_x, y2, BUTTON_W, BUTTON_H, (138,43,226), (160,82,255))
+        exit_btn   = draw_menu_button("EXIT", (MENU_W-BUTTON_W)//2, y_exit, BUTTON_W, BUTTON_H, (178,34,34), (220,50,50))
 
-        bfs_btn = draw_menu_button("Play BFS Mode", 180, 160, 240, 50, (70,130,180), (100,160,220))
-        dfs_btn = draw_menu_button("Play DFS Mode", 180, 220, 240, 50, (34,139,34), (60,179,60))
-        exit_btn = draw_menu_button("Exit",          180, 280, 240, 50, (178,34,34),(220,50,50))
-
+        # update
         pygame.display.flip()
+        clock.tick(30)
 
+        # xử lý sự kiện
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "exit"
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if bfs_btn.collidepoint(event.pos):
                     return "bfs"
                 elif dfs_btn.collidepoint(event.pos):
                     return "dfs"
+                elif greedy_btn.collidepoint(event.pos):
+                    return "greedy"
+                elif astar_btn.collidepoint(event.pos):
+                    return "astar"
                 elif exit_btn.collidepoint(event.pos):
                     return "exit"
-        clock.tick(30)
 
 def loading_screen():
     screen = pygame.display.set_mode((600, 400))
@@ -378,52 +404,77 @@ def loading_screen():
             running = False
 
 
-def transition_screen(text, color=(0,200,0)):
+def transition_screen(text, color=(255, 215, 0)):
     screen_w, screen_h = screen.get_size()
 
-    # Tạo background cuộn
-    try:
-        bg = ScrollingBackground(asset_path("background.png"), screen_h, speed=1)
-    except Exception:
-        bg = None
+    # Font
+    title_font = pygame.font.Font(font_path, 48)
+    info_font = pygame.font.SysFont("segoeui", 22)
 
+    # Load ảnh nền & scale theo chiều cao màn hình
+    bg_img = pygame.image.load(asset_path("background.png")).convert()
+    bg_width, bg_height = bg_img.get_size()
+    scale_factor = screen_h / bg_height
+    bg_width_scaled = int(bg_width * scale_factor)
+    bg_img = pygame.transform.scale(bg_img, (bg_width_scaled, screen_h))
+
+    scroll_x = 0
+    speed = 0.6
+
+    # Panel settings
+    panel_w, panel_h = 400, 200
+    panel_x = (screen_w - panel_w) // 2
+    panel_y = (screen_h - panel_h) // 2
+
+    # Fade-in alpha
+    alpha = 0
     waiting = True
     while waiting:
-        # Vẽ background động hoặc fallback
-        if bg:
-            bg.draw(screen)
-        else:
-            screen.fill((30, 30, 30))
+        # Cuộn background
+        scroll_x -= speed
+        if scroll_x <= -bg_width_scaled:
+            scroll_x = 0
+        screen.blit(bg_img, (scroll_x, 0))
+        screen.blit(bg_img, (scroll_x + bg_width_scaled, 0))
 
-        # Overlay làm tối nền
+        # Overlay tối
         overlay = pygame.Surface((screen_w, screen_h))
-        overlay.set_alpha(120)  # độ mờ (0 = trong suốt, 255 = đen đặc)
+        overlay.set_alpha(100)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
 
-        # ----- Text chính -----
-        label = big_font.render(text, True, color)
-        label_rect = label.get_rect(center=(screen_w // 2, screen_h // 2 - 50))
-        screen.blit(label, label_rect)
+        # ----- Panel -----
+        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        pygame.draw.rect(panel, (30, 30, 40, alpha), panel.get_rect(), border_radius=15)   # nền mờ
+        pygame.draw.rect(panel, (200, 200, 200, alpha), panel.get_rect(), 3, border_radius=15) # viền
+        screen.blit(panel, (panel_x, panel_y))
 
-        # ----- Info -----
-        info = font.render("Nhấn SPACE để tiếp tục...", True, (200,200,200))
-        info_rect = info.get_rect(center=(screen_w // 2, screen_h // 2 + 50))
-        screen.blit(info, info_rect)
+        # ----- Text trong panel -----
+        if alpha > 150:  # hiện chữ khi panel đã đủ rõ
+            label = title_font.render(text, True, color)
+            label_rect = label.get_rect(center=(screen_w // 2, panel_y + 70))
+            screen.blit(label, label_rect)
 
+            info = info_font.render("Nhấn SPACE để tiếp tục...", True, (220,220,220))
+            info_rect = info.get_rect(center=(screen_w // 2, panel_y + panel_h - 40))
+            screen.blit(info, info_rect)
+
+        # Cập nhật
         pygame.display.flip()
 
-        # Xử lý sự kiện
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "exit"
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and alpha >= 180:
                 waiting = False
 
-        clock.tick(30)
+        # Tăng alpha cho hiệu ứng fade-in
+        if alpha < 220:
+            alpha += 5
+
+        clock.tick(60)
 
     return "next"
-
 
 def blur_surface(surface, radius=5):
     arr = pygame.surfarray.array3d(surface)
@@ -527,3 +578,4 @@ def draw_minimap(maze, player_pos, hunter_pos, goal, panel_rect, offset_x, offse
     view_rw = VIEWPORT_W * sx
     view_rh = VIEWPORT_H * sy
     pygame.draw.rect(screen, (0,200,0), (view_rx, view_ry, view_rw, view_rh), 2)
+
