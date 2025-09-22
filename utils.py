@@ -1,12 +1,9 @@
-import pygame
-import os
-import random
-import math
+import pygame, os, random, math
 from pathfinding import bfs, dfs, greedy, astar
 from collections import deque
 from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
-    asset_path, available_themes
+    asset_path
 )
 from PIL import Image, ImageFilter
 import numpy as np
@@ -18,6 +15,7 @@ from constants import CELL_SIZE, VIEWPORT_W, VIEWPORT_H, path_tile
 # Khởi tạo Pygame và màn hình ban đầu
 pygame.init()
 pygame.mixer.init()
+pygame.display.set_caption("Maze Hunter")
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 screen = pygame.display.set_mode((1, 1))
 
@@ -26,7 +24,6 @@ font_path = asset_path("font/Pixeboy.ttf")
 font = pygame.font.SysFont("Segoe UI", 22)
 big_font = pygame.font.SysFont("Segoe UI", 48, bold=True)
 menu_font = pygame.font.Font(font_path, 80)
-#floor_img = pygame.transform.scale(pygame.image.load(asset_path("road/road_white.png")).convert(), (CELL_SIZE, CELL_SIZE)) # Xóa dòng này
 treasure_img = pygame.transform.scale(pygame.image.load(asset_path("treasure.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE))
 clock = pygame.time.Clock()
 path_tile = pygame.image.load(asset_path("path.png")).convert_alpha()
@@ -193,7 +190,7 @@ def draw_path(screen, path, offset_x, offset_y):
         screen.blit(path_tile, (x, y))
 
 # Tạo font riêng cho control panel
-control_font = pygame.font.Font(font_path, 22)  # chỉnh cỡ chữ theo ý bạn
+control_font = pygame.font.Font(font_path, 22) 
 
 def draw_control_panel(view_w, view_h, paused):
     panel_w = 160
@@ -246,7 +243,7 @@ def get_control_buttons(paused):
     buttons["reset"] = reset_btn
     y += btn_h + gap
 
-    surrender_btn = pygame.Rect(x, y, btn_h, btn_h)
+    surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
     buttons["surrender"] = surrender_btn
 
     return buttons
@@ -260,6 +257,7 @@ def draw_control_button(rect, text, color):
 def main_menu():
     screen_w, screen_h = 800, 600
     screen = pygame.display.set_mode((screen_w, screen_h))
+    
     try:
         bg = ScrollingBackground(asset_path("background.png"), 600, speed = 1)
     except Exception:
@@ -338,8 +336,8 @@ def main_menu():
 
 def loading_screen():
     screen = pygame.display.set_mode((600, 400))
-
-    # Font: Title dùng font riêng của bạn, còn lại Segoe UI
+   
+    # Font title
     title_font = pygame.font.Font(font_path, 40)  
     tip_font = pygame.font.SysFont("segoeui", 22, bold = True)
     bar_font = pygame.font.SysFont("segoeui", 20)
@@ -377,7 +375,7 @@ def loading_screen():
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
 
-        # Title (font riêng của bạn, màu vàng sáng)
+        # Title (màu vàng sáng)
         title = title_font.render("Loading Maze Hunter...", True, (255, 215, 0))
         screen.blit(title, (300 - title.get_width() // 2, 100))
 
@@ -399,7 +397,7 @@ def loading_screen():
         clock.tick(60)
 
         # Tăng tiến độ
-        progress += 0.004
+        progress += 0.006
         if progress >= 1:
             running = False
 
