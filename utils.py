@@ -192,10 +192,15 @@ def draw_path(screen, path, offset_x, offset_y):
 # Tạo font riêng cho control panel
 control_font = pygame.font.Font(font_path, 22) 
 
-def draw_control_panel(view_w, view_h, paused):
+def draw_control_panel(view_w, view_h, paused, mode_name = ""):
     panel_w = 160
     panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
+
+    # --- Hiển thị chế độ chơi ---
+    if mode_name:
+        mode_label = control_font.render(f"Mode: {mode_name}", True, (255, 215, 0))
+        screen.blit(mode_label, (view_w + (panel_w - mode_label.get_width()) // 2, 100))
 
     btn_w, btn_h, gap = 120, 50, 20
     x = view_w + 20
@@ -253,86 +258,6 @@ def draw_control_button(rect, text, color):
     label = control_font.render(text, True, (255, 255, 255))
     screen.blit(label, (rect.centerx - label.get_width() // 2,
                         rect.centery - label.get_height() // 2))
-
-def main_menu():
-    screen_w, screen_h = 800, 600
-    screen = pygame.display.set_mode((screen_w, screen_h))
-    
-    try:
-        bg = ScrollingBackground(asset_path("background.png"), 600, speed = 1)
-    except Exception:
-        bg = None
-
-    button_font = pygame.font.Font(font_path, 28)
-
-    def draw_menu_button(text, x, y, w, h, color, hover_color, text_color=(255,255,255)):
-        rect = pygame.Rect(x, y, w, h)
-        mouse_pos = pygame.mouse.get_pos()
-        if rect.collidepoint(mouse_pos):
-            pygame.draw.rect(screen, hover_color, rect, border_radius=10)
-        else:
-            pygame.draw.rect(screen, color, rect, border_radius=10)
-        label = button_font.render(text, True, text_color)
-        screen.blit(label, (x + (w - label.get_width()) // 2,
-                            y + (h - label.get_height()) // 2))
-        return rect
-
-    MENU_W = screen_w
-    BUTTON_W = 200
-    BUTTON_H = 50
-    GAP = 40
-
-    # tọa độ căn 2 nút trên 1 hàng
-    left_x  = (MENU_W - (BUTTON_W * 2 + GAP)) // 2
-    right_x = left_x + BUTTON_W + GAP
-
-    y1 = 200
-    y2 = 280
-    y_exit = 380
-
-    while True:
-        # vẽ background
-        if bg:
-            bg.draw(screen)
-            overlay = pygame.Surface((screen_w, screen_h))
-            overlay.set_alpha(120)
-            overlay.fill((0, 0, 0))
-            screen.blit(overlay, (0, 0))
-        else:
-            screen.fill((30, 30, 40))
-
-        # Title
-        title_text = "Maze Hunter"
-        title_color = (255, 215, 0)
-        title = menu_font.render(title_text, True, title_color)
-        screen.blit(title, (screen_w // 2 - title.get_width() // 2, 80))
-
-        # Buttons
-        bfs_btn    = draw_menu_button("PLAY BFS MODE", left_x,  y1, BUTTON_W, BUTTON_H, (70,130,180), (100,160,220))
-        dfs_btn    = draw_menu_button("PLAY DFS MODE", right_x, y1, BUTTON_W, BUTTON_H, (34,139,34),  (60,179,60))
-        greedy_btn = draw_menu_button("PLAY GREEDY",   left_x,  y2, BUTTON_W, BUTTON_H, (218,165,32), (238,201,0))
-        astar_btn  = draw_menu_button("PLAY A* MODE",  right_x, y2, BUTTON_W, BUTTON_H, (138,43,226), (160,82,255))
-        exit_btn   = draw_menu_button("EXIT", (MENU_W-BUTTON_W)//2, y_exit, BUTTON_W, BUTTON_H, (178,34,34), (220,50,50))
-
-        # update
-        pygame.display.flip()
-        clock.tick(30)
-
-        # xử lý sự kiện
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return "exit"
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if bfs_btn.collidepoint(event.pos):
-                    return "bfs"
-                elif dfs_btn.collidepoint(event.pos):
-                    return "dfs"
-                elif greedy_btn.collidepoint(event.pos):
-                    return "greedy"
-                elif astar_btn.collidepoint(event.pos):
-                    return "astar"
-                elif exit_btn.collidepoint(event.pos):
-                    return "exit"
 
 def loading_screen():
     screen = pygame.display.set_mode((600, 400))

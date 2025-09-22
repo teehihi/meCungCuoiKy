@@ -274,7 +274,7 @@ def game_loop(mode):
         player.draw(screen, offset_x, offset_y)
         hunter.draw(screen, offset_x, offset_y)
 
-        draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused)
+        draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode)
         draw_minimap(maze, player.pos, hunter.pos, goal, panel_rect, offset_x, offset_y, MAP_W_PIX, MAP_H_PIX)
 
         pygame.display.flip()
