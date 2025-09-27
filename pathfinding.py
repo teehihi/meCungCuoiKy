@@ -81,3 +81,69 @@ def astar(start, goal, maze):
                     f2 = g2 + hx((nr, nc), goal)
                     heapq.heappush(pq, (f2, g2, (nr, nc), path+[(nr, nc)]))
     return []
+
+import math
+import random
+
+# Hill Climbing
+def hill_climbing(start, goal, maze, max_steps=1000):
+    ROWS, COLS = len(maze), len(maze[0])
+    current = start
+    path = [current]
+
+    for _ in range(max_steps):
+        if current == goal:
+            return path
+        neighbors = []
+        for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:
+            nr, nc = current[0]+dr, current[1]+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                neighbors.append((nr,nc))
+
+        if not neighbors:
+            break
+
+        # chọn neighbor có heuristic nhỏ nhất (tốt nhất)
+        best = min(neighbors, key=lambda x: hx(x, goal))
+        if hx(best, goal) >= hx(current, goal):  # không tiến bộ thì dừng
+            break
+
+        current = best
+        path.append(current)
+
+    return path if current == goal else []
+
+# Simulated Annealing
+def simulated_annealing(start, goal, maze, max_steps=1000, T=100.0, alpha=0.99):
+    ROWS, COLS = len(maze), len(maze[0])
+    current = start
+    path = [current]
+
+    for _ in range(max_steps):
+        if current == goal:
+            return path
+
+        neighbors = []
+        for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:
+            nr, nc = current[0]+dr, current[1]+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                neighbors.append((nr,nc))
+
+        if not neighbors:
+            break
+
+        next_node = random.choice(neighbors)
+        deltaE = hx(current, goal) - hx(next_node, goal)
+
+        if deltaE > 0:  # tốt hơn
+            current = next_node
+            path.append(current)
+        else:  # kém hơn nhưng có thể nhận theo xác suất
+            prob = math.exp(deltaE / T) if T > 0 else 0
+            if random.random() < prob:
+                current = next_node
+                path.append(current)
+
+        T *= alpha  # giảm nhiệt độ dần
+
+    return path if current == goal else []
