@@ -261,10 +261,19 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0):
 
     return buttons, panel_w
 
+# Sửa hàm get_control_buttons:
+
 def get_control_buttons(paused):
     btn_w, btn_h, gap = 120, 50, 20
     x = VIEWPORT_W + 20
-    y = 160
+    
+    # --- Đồng bộ vị trí bắt đầu các nút với draw_control_panel ---
+    # Trong draw_control_panel: minimap_bottom = 140, y = 140 + 20 = 160 (start coin)
+    # ky = 160 + 40 = 200 (start key)
+    # Sau coin/key, y = ky + 60 = 200 + 60 = 260 (start button)
+    y = 260 
+    # -----------------------------------------------------------
+    
     buttons = {}
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)

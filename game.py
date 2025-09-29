@@ -85,14 +85,16 @@ def stop_all_sfx():
         pass
 
 # ------------------ Game loop ------------------
-def game_loop(mode):
+def game_loop(mode, initial_coins=0, initial_keys=0):
 
     # Đặt tên cửa sổ theo chế độ
     mode_titles = {
         "bfs": "Maze Hunter - BFS Mode",
         "dfs": "Maze Hunter - DFS Mode",
         "greedy": "Maze Hunter - Greedy Mode",
-        "astar": "Maze Hunter - A* Mode"
+        "astar": "Maze Hunter - A* Mode",
+        "hillclimbing": "Maze Hunter - Hill Climbing Mode",
+        "sa" : "Maze Hunter - Simulated Annealing Mode"
     }
     pygame.display.set_caption(mode_titles.get(mode, "Maze Hunter"))
 
@@ -128,8 +130,9 @@ def game_loop(mode):
     hunter = Hunter(hunter_start_pos, theme)
 
     # --- INVENTORY & ITEMS ---
-    coins = 0
-    keys = 0
+    # Cập nhật: Sử dụng giá trị truyền vào thay vì hardcode 0
+    coins = initial_coins  
+    keys = initial_keys   
 
     # cấu trúc item: {"type": "coin"/"quiz", "pos": (r,c)}
     items = []
@@ -210,7 +213,7 @@ def game_loop(mode):
                     except Exception:
                         pass
                     stop_all_sfx()
-                    return "reset"
+                    return "reset", coins, keys
 
                 if buttons.get("pause") and buttons["pause"].collidepoint(event.pos): 
                     paused = True
@@ -224,7 +227,7 @@ def game_loop(mode):
                     except Exception:
                         pass
                     stop_all_sfx()
-                    return "exit"
+                    return "exit", coins, keys
 
 
                 if event.button == 1 and event.pos[0] < VIEWPORT_W and event.pos[1] < VIEWPORT_H:
@@ -370,7 +373,7 @@ def game_loop(mode):
                     y = r*CELL_SIZE - offset_y
                     pygame.draw.rect(screen, (150,100,200), (x+CELL_SIZE*0.15, y+CELL_SIZE*0.15, CELL_SIZE*0.7, CELL_SIZE*0.7), border_radius=6)
 
-        draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode)
+        draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode, coins=coins, keys=keys)
         draw_minimap(maze, player.pos, hunter.pos, goal, panel_rect, offset_x, offset_y, MAP_W_PIX, MAP_H_PIX)
 
         pygame.display.flip()
@@ -403,11 +406,11 @@ def game_loop(mode):
                     pygame.mixer.music.stop()
                 except Exception:
                     pass
-                return "win"
+                return "win", coins, keys
 
     try:
         pygame.mixer.music.stop()
     except Exception:
         pass
     stop_all_sfx()
-    return "exit"
+    return "exit", coins, keys
