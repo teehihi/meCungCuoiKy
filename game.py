@@ -55,8 +55,10 @@ def try_load_sound(*paths):
 
 win_sound = try_load_sound("sounds/win.mp3", "sounds/win.wav")
 lose_sound = try_load_sound("sounds/lose.mp3", "sounds/lose.wav")
+shout_sound = try_load_sound("sounds/shout.mp3")
 foot_sound = try_load_sound("sounds/foot.mp3", "sounds/step.mp3", "sounds/foot.wav")
-
+coin_collect = try_load_sound("sounds/coin_collect.mp3")
+quiz_sound = try_load_sound("sounds/quizzSound.mp3")
 # Tạo channel riêng cho lose & foot nếu có
 if pygame.mixer.get_init():
     try:
@@ -85,7 +87,7 @@ def stop_all_sfx():
         pass
 
 # ------------------ Game loop ------------------
-def game_loop(mode, initial_coins=0, initial_keys=0):
+def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
 
     # Đặt tên cửa sổ theo chế độ
     mode_titles = {
@@ -117,8 +119,8 @@ def game_loop(mode, initial_coins=0, initial_keys=0):
     pygame.display.set_mode((VIEWPORT_W + panel_w, VIEWPORT_H))
     
     start, goal = (1,1), farthest_cell(maze, (1,1))
-    
-    player = Player(start)
+    # Thêm số mạng vào 
+    player = Player(start, initial_lives)
     hunter_start_pos = [ROWS//2, COLS//2]
     if maze[hunter_start_pos[0]][hunter_start_pos[1]] == 1:
         for r in range(ROWS):
@@ -128,6 +130,11 @@ def game_loop(mode, initial_coins=0, initial_keys=0):
                     break
 
     hunter = Hunter(hunter_start_pos, theme)
+
+    # === Cơ chế spawn hunter ====
+    hunter_stun_timer = 0
+    STUN_DURATION = 1000 # 1 giây = 1000 ms
+    RESPAWN_DISTANCE = 5 # Khoảng cách tối thiểu để spawn lại
 
     # --- INVENTORY & ITEMS ---
     # Cập nhật: Sử dụng giá trị truyền vào thay vì hardcode 0
@@ -294,11 +301,22 @@ def game_loop(mode, initial_coins=0, initial_keys=0):
                 if picked["type"] == "coin":
                     coins += 1
                     items.remove(picked)
-                    # optional: play coin sound
+                    if coin_collect:
+                        try:
+                            # Dùng kênh mixer mặc định nếu không muốn tạo kênh riêng cho coin
+                            coin_collect.play() 
+                        except Exception:
+                            pass
                 elif picked["type"] == "quiz":
                     
                     # --- BẮT ĐẦU SỬA CHỮA VÀ CHỤP MÀN HÌNH ---
-                    
+                    # 1. TẠM DỪNG NHẠC NỀN & PHÁT ÂM THANH QUIZ
+                    try:
+                        pygame.mixer.music.pause() # Tạm dừng BGM
+                        if quiz_sound:
+                             quiz_sound.play() # Phát âm thanh Quiz
+                    except Exception:
+                        pass
                     # VẼ LẠI CÁC THÀNH PHẦN CHÍNH để đảm bảo ảnh chụp là mới nhất
                     draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img, floor_img)
                     player.draw(screen, offset_x, offset_y)
@@ -310,7 +328,14 @@ def game_loop(mode, initial_coins=0, initial_keys=0):
                     # GỌI POPUP VÀ TRUYỀN HÌNH ẢNH NỀN VÀO
                     SKIP_COST = 10  # hoặc giá khác
                     res = show_question_popup(coins, skip_cost=SKIP_COST, background_snapshot=background_snapshot)
-                    
+                    # 2. TIẾP TỤC NHẠC NỀN SAU KHI QUIZ KẾT THÚC
+                    try:
+                        if quiz_sound:
+                            quiz_sound.stop()
+                        pygame.mixer.music.unpause() # Tiếp tục BGM
+                    except Exception:
+                        pass
+
                     # --- KẾT THÚC SỬA CHỮA ---
                     
                     if res == "correct":
@@ -373,28 +398,62 @@ def game_loop(mode, initial_coins=0, initial_keys=0):
                     y = r*CELL_SIZE - offset_y
                     pygame.draw.rect(screen, (150,100,200), (x+CELL_SIZE*0.15, y+CELL_SIZE*0.15, CELL_SIZE*0.7, CELL_SIZE*0.7), border_radius=6)
 
-        draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode, coins=coins, keys=keys)
+        draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode, coins=coins, keys=keys, lives=player.lives) # <--- TRUYỀN MẠNG
+
         draw_minimap(maze, player.pos, hunter.pos, goal, panel_rect, offset_x, offset_y, MAP_W_PIX, MAP_H_PIX)
 
         pygame.display.flip()
         clock.tick(30)
 
-        # Kiểm tra win/lose sau update
+        # Kiểm tra win/lose
         if not paused:
             if tuple(player.pos) == tuple(hunter.pos):
-                if lose_sound:
+                # Trừ 1 mạng của người chơi
+                remaining_lives = player.lose_life()
+                
+                sound_to_play = None
+                if remaining_lives > 0:
+                    # Nếu còn mạng, phát âm thanh bị thương/la hét (shout_sound)
+                    sound_to_play = shout_sound 
+                else:
+                    # Nếu hết mạng (<= 0), phát âm thanh thua (lose_sound)
+                    sound_to_play = lose_sound
+                if sound_to_play:
                     try:
+                        # Dùng lose_channel để phát (vì đó là channel riêng bạn đã thiết lập cho âm thanh quan trọng)
                         if lose_channel:
-                            lose_channel.play(lose_sound)
+                            lose_channel.play(sound_to_play)
                         else:
-                            lose_sound.play()
+                            sound_to_play.play()
                     except Exception:
                         pass
-                try:
-                    pygame.mixer.music.stop()
-                except Exception:
-                    pass
-                return "lose"
+                # --- XỬ LÝ SỐC VÀ DỊCH CHUYỂN HUNTER ---
+                hunter_stun_timer = pygame.time.get_ticks() + STUN_DURATION
+                
+                # Tìm vị trí spawn mới cách player ít nhất RESP AWN_DISTANCE
+                new_hunter_pos = hunter.respawn_safely(maze, player.pos, RESPAWN_DISTANCE)
+                hunter.pos = new_hunter_pos
+                # Xóa đường đi cũ để Hunter tính toán lại sau khi hết stun
+                hunter.path = None 
+                # -----------------------------------------------------
+
+                # Kiểm tra thua
+                if remaining_lives <= 0:
+                    try:
+                        pygame.mixer.music.stop()
+                    except Exception:
+                        pass
+                    # Dừng game, trả về trạng thái thua
+                    return "lose", coins, keys # Trả về trạng thái cho main.py xử lý
+            
+            # 2. Xử lý Hunter bị Stun
+            if pygame.time.get_ticks() < hunter_stun_timer:
+                # Hunter đang bị đóng băng, không di chuyển
+                pass
+            else:
+                # Hunter không bị đóng băng, cho phép di chuyển và cập nhật
+                # Chỉ cập nhật Hunter nếu không bị đóng băng
+                hunter.update(player.pos, maze, mode, theme) 
 
             if tuple(player.pos) == goal:
                 if win_sound:

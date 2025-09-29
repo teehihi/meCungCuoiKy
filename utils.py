@@ -192,7 +192,7 @@ def draw_path(screen, path, offset_x, offset_y):
 # Tạo font riêng cho control panel
 control_font = pygame.font.Font(font_path, 22) 
 
-def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0):
+def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, lives=5):
     panel_w = 160
     panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
@@ -202,42 +202,63 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0):
         mode_label = control_font.render(f"Mode: {mode_name}", True, (255, 215, 0))
         screen.blit(mode_label, (view_w + (panel_w - mode_label.get_width()) // 2, 100))
 
-    # Giả sử mini map được vẽ ở trên control panel -> bạn xác định vị trí cuối của nó
-    minimap_bottom = 140   # ← nếu mini map cao ~100px, kết thúc ở 140px
+    minimap_bottom = 140
+    # y là vị trí bắt đầu của mục đầu tiên (Lives)
     y = minimap_bottom + 20
     x = view_w + 20
+    
+    # KHOẢNG CÁCH DỌC GIỮA CÁC MỤC
+    ITEM_GAP = 40 
 
-    # --- Vẽ coin và key dưới minimap ---
-    cx, cy = x, y
+    # 1. --- VẼ LIVES (BẮT ĐẦU TẠI y=160) ---
+    lx, ly = x, y
     try:
+        # ... (code vẽ life_icon) ...
+        life_icon = pygame.transform.scale(
+            pygame.image.load(asset_path("heart.png")).convert_alpha(), (28, 28)
+        )
+        screen.blit(life_icon, (lx, ly))
+    except Exception:
+        pygame.draw.circle(screen, (200, 50, 50), (lx + 14, ly + 14), 12)
+
+    life_txt = font.render(f"x {lives}", True, (255, 255, 255))
+    screen.blit(life_txt, (lx + 36, ly + 4))
+
+    # 2. --- VẼ COIN (BẮT ĐẦU TẠI y=160 + 40 = 200) ---
+    cy = y + ITEM_GAP  # CẬP NHẬT VỊ TRÍ MỚI
+    try:
+        # ... (code vẽ coin_icon) ...
         coin_icon = pygame.transform.scale(
             pygame.image.load(asset_path("coin.png")).convert_alpha(), (28, 28)
         )
-        screen.blit(coin_icon, (cx, cy))
+        screen.blit(coin_icon, (x, cy))
     except Exception:
-        pygame.draw.circle(screen, (212, 175, 55), (cx + 14, cy + 14), 12)
+        pygame.draw.circle(screen, (212, 175, 55), (x + 14, cy + 14), 12)
 
     coin_txt = font.render(f"x {coins}", True, (255, 255, 255))
-    screen.blit(coin_txt, (cx + 36, cy + 4))
+    screen.blit(coin_txt, (x + 36, cy + 4))
 
-    ky = cy + 40
+    # 3. --- VẼ KEY (BẮT ĐẦU TẠI y=200 + 40 = 240) ---
+    ky = cy + ITEM_GAP # CẬP NHẬT VỊ TRÍ MỚI
     try:
+        # ... (code vẽ key_icon) ...
         key_icon = pygame.transform.scale(
             pygame.image.load(asset_path("scroll.png")).convert_alpha(), (28, 28)
         )
-        screen.blit(key_icon, (cx, ky))
+        screen.blit(key_icon, (x, ky))
     except Exception:
-        pygame.draw.rect(screen, (200, 200, 0), (cx, ky, 24, 12))
+        pygame.draw.rect(screen, (200, 200, 0), (x, ky, 24, 12))
 
     key_txt = font.render(f"x {keys}", True, (255, 255, 255))
-    screen.blit(key_txt, (cx + 36, ky + 2))
+    screen.blit(key_txt, (x + 36, ky + 2))
 
-    # Sau coin/key mới tới các nút
+    # 4. --- NÚT ĐIỀU KHIỂN (BẮT ĐẦU TẠI y=240 + 60 = 300) ---
     y = ky + 60
     btn_w, btn_h, gap = 120, 50, 20
     buttons = {}
 
     # Pause / Continue
+    # ... (code vẽ nút Pause/Continue) ...
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)
         draw_control_button(pause_btn, "Pause", (80, 80, 200))
@@ -249,29 +270,30 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0):
     y += btn_h + gap
 
     # Reset
+    # ... (code vẽ nút Reset) ...
     reset_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(reset_btn, "Reset", (200, 150, 50))
     buttons["reset"] = reset_btn
     y += btn_h + gap
 
     # Surrender
+    # ... (code vẽ nút Surrender) ...
     surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(surrender_btn, "Surrender", (200, 60, 60))
     buttons["surrender"] = surrender_btn
 
     return buttons, panel_w
 
-# Sửa hàm get_control_buttons:
-
 def get_control_buttons(paused):
     btn_w, btn_h, gap = 120, 50, 20
     x = VIEWPORT_W + 20
     
-    # --- Đồng bộ vị trí bắt đầu các nút với draw_control_panel ---
-    # Trong draw_control_panel: minimap_bottom = 140, y = 140 + 20 = 160 (start coin)
-    # ky = 160 + 40 = 200 (start key)
-    # Sau coin/key, y = ky + 60 = 200 + 60 = 260 (start button)
-    y = 260 
+    # Trong draw_control_panel:
+    # Lives = 140 + 20 = 160
+    # Coins = 160 + 40 = 200
+    # Keys = 200 + 40 = 240
+    # Nút bắt đầu: Keys + 60 = 240 + 60 = 300
+    y = 300 # <--- ĐIỀU CHỈNH VỊ TRÍ BẮT ĐẦU CỦA NÚT
     # -----------------------------------------------------------
     
     buttons = {}

@@ -27,6 +27,15 @@ DEFAULT_SKIP_COST = 10
 # Tải font
 small_font = pygame.font.Font(font_path, 24)
 question_font = pygame.font.Font(font_path, 60)  # chữ câu hỏi to hơn
+def try_load_sound(*paths):
+    for p in paths:
+        try:
+            return pygame.mixer.Sound(asset_path(p))
+        except Exception:
+            continue
+    return None
+correct_sound = try_load_sound("sounds/correctSound.mp3", "sounds/sfx_correct.wav")
+wrong_sound = try_load_sound("sounds/wrongSound.mp3", "sounds/sfx_wrong.wav")
 
 # Tải icon coin + quiz
 try:
@@ -171,12 +180,23 @@ def render_popup(question_obj, coins, skip_cost=DEFAULT_SKIP_COST, background_sn
         if result:
             feedback = "Correct!" if result == "correct" else "Wrong!"
             color = (50, 200, 50) if result == "correct" else (200, 60, 60)
+            
+            # --- PHÁT ÂM THANH DỰA TRÊN KẾT QUẢ (PHẦN SỬA CHỮA) ---
+            if result == "correct" and correct_sound:
+                correct_sound.play()
+            elif result == "wrong" and wrong_sound:
+                wrong_sound.play()
+            # -------------------------------------------------------
+
             fb_surf = menu_font.render(feedback, True, color)
             fb_rect = fb_surf.get_rect(center=(panel_x + panel_w // 2,
-                                               panel_y + panel_h - 100))
+                                            panel_y + panel_h - 100))
             screen.blit(fb_surf, fb_rect)
             pygame.display.flip()
-            pygame.time.delay(700)
+            
+            # Delay để người chơi thấy kết quả và nghe âm thanh
+            pygame.time.delay(700) 
+            
             return result
 
         pygame.display.flip()

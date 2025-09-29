@@ -11,6 +11,7 @@ def main():
         mode = main_menu()
         if mode == "exit":
             break   # thoát game
+        
 
         # màn hình loading
         loading_screen()
