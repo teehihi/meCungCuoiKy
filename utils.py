@@ -89,7 +89,6 @@ def load_theme(theme_name):
     
     return wall_images, bg_img, road_img
 
-
 # Các hàm tạo maze
 def generate_maze(width, height):
     if width % 2 == 0: width += 1
@@ -192,7 +191,7 @@ def draw_path(screen, path, offset_x, offset_y):
 # Tạo font riêng cho control panel
 control_font = pygame.font.Font(font_path, 22) 
 
-def draw_control_panel(view_w, view_h, paused, mode_name = ""):
+def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, lives=5):
     panel_w = 160
     panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
@@ -202,12 +201,73 @@ def draw_control_panel(view_w, view_h, paused, mode_name = ""):
         mode_label = control_font.render(f"Mode: {mode_name}", True, (255, 215, 0))
         screen.blit(mode_label, (view_w + (panel_w - mode_label.get_width()) // 2, 100))
 
-    btn_w, btn_h, gap = 120, 50, 20
+    minimap_bottom = 140
+    # y là vị trí bắt đầu của mục đầu tiên (Lives)
+    y = minimap_bottom + 20
     x = view_w + 20
-    y = 160
+    
+    # KHOẢNG CÁCH DỌC GIỮA CÁC MỤC
+    ITEM_GAP = 40 
+
+    # --- CẤU HÌNH FRAME ---
+    padding = 10
+    icon_size = 28
+    num_items = 3
+    frame_w = padding * 2 + icon_size + 36 + 20  # icon + text + padding
+    frame_h = padding * 2 + num_items * icon_size + (num_items - 1) * (ITEM_GAP - icon_size)
+    frame_x, frame_y = x - padding, y - padding
+
+    # VẼ NỀN VÀ VIỀN FRAME
+    pygame.draw.rect(screen, (40, 40, 40), (frame_x, frame_y, frame_w, frame_h))          # nền
+    pygame.draw.rect(screen, (255, 255, 255), (frame_x, frame_y, frame_w, frame_h), 2)    # viền trắng
+
+    # --- VẼ LIVES ---
+    lx, ly = x, y
+    try:
+        life_icon = pygame.transform.scale(
+            pygame.image.load(asset_path("heart.png")).convert_alpha(), (icon_size, icon_size)
+        )
+        screen.blit(life_icon, (lx, ly))
+    except Exception:
+        pygame.draw.circle(screen, (200, 50, 50), (lx + icon_size//2, ly + icon_size//2), icon_size//2)
+
+    life_txt = font.render(f"x {lives}", True, (255, 255, 255))
+    screen.blit(life_txt, (lx + icon_size + 6, ly + 4))
+
+    # --- VẼ COIN ---
+    cy = ly + ITEM_GAP
+    try:
+        coin_icon = pygame.transform.scale(
+            pygame.image.load(asset_path("coin.png")).convert_alpha(), (icon_size, icon_size)
+        )
+        screen.blit(coin_icon, (x, cy))
+    except Exception:
+        pygame.draw.circle(screen, (212, 175, 55), (x + icon_size//2, cy + icon_size//2), icon_size//2)
+
+    coin_txt = font.render(f"x {coins}", True, (255, 255, 255))
+    screen.blit(coin_txt, (x + icon_size + 6, cy + 4))
+
+    # --- VẼ KEY ---
+    ky = cy + ITEM_GAP
+    try:
+        key_icon = pygame.transform.scale(
+            pygame.image.load(asset_path("scroll.png")).convert_alpha(), (icon_size, icon_size)
+        )
+        screen.blit(key_icon, (x, ky))
+    except Exception:
+        pygame.draw.rect(screen, (200, 200, 0), (x, ky + icon_size//4, icon_size, icon_size//2))
+
+    key_txt = font.render(f"x {keys}", True, (255, 255, 255))
+    screen.blit(key_txt, (x + icon_size + 6, ky + 4))
+
+
+    # 4. --- NÚT ĐIỀU KHIỂN (BẮT ĐẦU TẠI y=240 + 60 = 300) ---
+    y = ky + 60
+    btn_w, btn_h, gap = 120, 50, 20
     buttons = {}
 
     # Pause / Continue
+    # ... (code vẽ nút Pause/Continue) ...
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)
         draw_control_button(pause_btn, "Pause", (80, 80, 200))
@@ -219,12 +279,14 @@ def draw_control_panel(view_w, view_h, paused, mode_name = ""):
     y += btn_h + gap
 
     # Reset
+    # ... (code vẽ nút Reset) ...
     reset_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(reset_btn, "Reset", (200, 150, 50))
     buttons["reset"] = reset_btn
     y += btn_h + gap
 
     # Surrender
+    # ... (code vẽ nút Surrender) ...
     surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(surrender_btn, "Surrender", (200, 60, 60))
     buttons["surrender"] = surrender_btn
@@ -234,7 +296,15 @@ def draw_control_panel(view_w, view_h, paused, mode_name = ""):
 def get_control_buttons(paused):
     btn_w, btn_h, gap = 120, 50, 20
     x = VIEWPORT_W + 20
-    y = 160
+    
+    # Trong draw_control_panel:
+    # Lives = 140 + 20 = 160
+    # Coins = 160 + 40 = 200
+    # Keys = 200 + 40 = 240
+    # Nút bắt đầu: Keys + 60 = 240 + 60 = 300
+    y = 300 # <--- ĐIỀU CHỈNH VỊ TRÍ BẮT ĐẦU CỦA NÚT
+    # -----------------------------------------------------------
+    
     buttons = {}
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)
@@ -502,3 +572,15 @@ def draw_minimap(maze, player_pos, hunter_pos, goal, panel_rect, offset_x, offse
     view_rh = VIEWPORT_H * sy
     pygame.draw.rect(screen, (0,200,0), (view_rx, view_ry, view_rw, view_rh), 2)
 
+def can_unlock_level(keys, required_keys=3):
+    """
+    Kiểm tra người chơi có đủ key để mở cửa qua màn.
+
+    Args:
+        keys (int): số lượng key hiện tại của người chơi.
+        required_keys (int): số lượng key cần thiết để qua màn. Mặc định là 3.
+
+    Returns:
+        bool: True nếu đủ key, False nếu chưa đủ.
+    """
+    return keys >= required_keys

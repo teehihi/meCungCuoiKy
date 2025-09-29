@@ -1,5 +1,5 @@
 import pygame
-import os
+import os, random
 from collections import deque
 from constants import CELL_SIZE, hunter_speed, hunter_anim_speed, asset_path
 from pathfinding import bfs  # dùng bfs như connector ngắn
@@ -117,6 +117,9 @@ def dfs_adjusted(start, goal, maze, old_path=None):
         pass
     return dfs_local(start, goal, maze)
 
+def manhattan_distance(p1, p2):
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
 # =================== Hunter Class (Đã chỉnh sửa) ===================
 class Hunter:
     def __init__(self, start_pos, theme):
@@ -183,9 +186,21 @@ class Hunter:
         self.update_animation()
 
     def update_animation(self):
-        animation_speed = hunter_anim_speed if len(self.path) > 1 else hunter_anim_speed * 6
+        
+        # 1. KIỂM TRA TRẠNG THÁI CỦA PATH (Đường đi)
+        if self.path is not None:
+            # Nếu Hunter có đường đi (đang di chuyển), sử dụng logic tốc độ gốc:
+            # Di chuyển nhanh (len(path) > 1) hoặc chậm lại (len(path) <= 1)
+            animation_speed = hunter_anim_speed if len(self.path) > 1 else hunter_anim_speed * 6
+        else:
+            # 2. XỬ LÝ KHI PATH LÀ NONE (Hunter đang đứng yên/bị stun)
+            # Đặt tốc độ animation chậm để mô phỏng trạng thái đứng yên/thở/đóng băng
+            animation_speed = hunter_anim_speed * 6 # Tốc độ chậm (giống như khi đứng yên)
+            
         self.frame_timer += 1
         if self.frame_timer >= animation_speed:
+            # Đảm bảo self.animations[self.direction] tồn tại và có frames
+            # (Giả định rằng animations luôn được load đúng)
             self.frame_index = (self.frame_index + 1) % len(self.animations[self.direction])
             self.frame_timer = 0
 
@@ -195,3 +210,21 @@ class Hunter:
         x = self.pos[1] * CELL_SIZE - offset_x
         y = self.pos[0] * CELL_SIZE - offset_y
         screen.blit(img, (x, y))
+
+    def respawn_safely(self, maze, player_pos, min_dist):
+        rows, cols = len(maze), len(maze[0])
+        safe_cells = []
+        
+        for r in range(rows):
+            for c in range(cols):
+                if maze[r][c] == 0:  # Là ô đi được
+                    dist = manhattan_distance((r, c), player_pos)
+                    if dist >= min_dist:
+                        safe_cells.append((r, c))
+                        
+        if safe_cells:
+            # Chọn ngẫu nhiên một ô an toàn
+            return list(random.choice(safe_cells))
+        else:
+            # Nếu không tìm thấy (map quá nhỏ), quay lại vị trí bắt đầu (hoặc vị trí ngẫu nhiên)
+            return [1, 1] 
