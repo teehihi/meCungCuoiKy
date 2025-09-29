@@ -4,6 +4,7 @@ from player import Player
 from enemy import Hunter
 from background import ScrollingBackground 
 from quiz import show_question_popup 
+from utils import *
 from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
     CAMERA_LERP, available_themes, asset_path
@@ -288,7 +289,6 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
             hunter.update(player.pos, maze, mode, theme)
 
 
-
             # item pickup check (khi vào tile có item)
             p_pos = tuple(player.pos)
             picked = None
@@ -456,16 +456,26 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                 hunter.update(player.pos, maze, mode, theme) 
 
             if tuple(player.pos) == goal:
-                if win_sound:
+                if can_unlock_level(keys):  # kiểm tra đủ key
+                    if win_sound:
+                        try:
+                            win_sound.play()
+                        except Exception:
+                            pass
                     try:
-                        win_sound.play()
+                        pygame.mixer.music.stop()
                     except Exception:
                         pass
-                try:
-                    pygame.mixer.music.stop()
-                except Exception:
-                    pass
-                return "win", coins, keys
+                    return "win", coins, keys
+                else:
+                # Chưa đủ key, hiện thông báo đỏ trên màn hình
+                    font = pygame.font.SysFont("Segoe UI", 24, bold=True)
+                    msg = f"Cần {3 - keys} key nữa để qua màn!"
+                    label = font.render(msg, True, (255, 50, 50))
+                    screen.blit(label, (VIEWPORT_W//2 - label.get_width()//2, VIEWPORT_H//2 - 20))
+                    pygame.display.flip()
+                    # tạm dừng 1 giây để người chơi thấy thông báo
+                    pygame.time.delay(1000)
 
     try:
         pygame.mixer.music.stop()
