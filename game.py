@@ -3,13 +3,14 @@ import random
 from player import Player
 from enemy import Hunter
 from background import ScrollingBackground 
+from quiz import show_question_popup 
 from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
     CAMERA_LERP, available_themes, asset_path
 )
 from utils import (
     load_theme, generate_maze, farthest_cell,
-    draw_maze, draw_path, draw_control_panel, get_control_buttons, draw_minimap,
+    draw_maze, draw_path, draw_control_panel, get_control_buttons, draw_minimap, draw_entity,
     clamp, screen, clock
 )
 
@@ -125,6 +126,38 @@ def game_loop(mode):
                     break
 
     hunter = Hunter(hunter_start_pos, theme)
+
+    # --- INVENTORY & ITEMS ---
+    coins = 0
+    keys = 0
+
+    # cấu trúc item: {"type": "coin"/"quiz", "pos": (r,c)}
+    items = []
+
+    # --- helper: lấy danh sách ô floor để spawn ---
+    floor_cells = [(r,c) for r in range(ROWS) for c in range(COLS) if maze[r][c] == 0]
+    # loại trừ start/goal/hunter start
+    for ban in (start, goal, tuple(hunter_start_pos)):
+        if ban in floor_cells:
+            try:
+                floor_cells.remove(ban)
+            except ValueError:
+                pass
+
+    # spawn coins & quiz items ngẫu nhiên
+    NUM_COINS = max(6, (ROWS*COLS)//120)    # điều chỉnh số lượng theo map
+    NUM_QUIZ = max(4, (ROWS*COLS)//300)
+    random.shuffle(floor_cells)
+    idx = 0
+    for i in range(NUM_COINS):
+        if idx >= len(floor_cells): break
+        items.append({"type":"coin", "pos": floor_cells[idx]})
+        idx += 1
+    for i in range(NUM_QUIZ):
+        if idx >= len(floor_cells): break
+        items.append({"type":"quiz", "pos": floor_cells[idx]})
+        idx += 1
+
 
     running, paused = True, False
     
@@ -244,6 +277,47 @@ def game_loop(mode):
             # Sửa dòng này để truyền thêm theme
             hunter.update(player.pos, maze, mode, theme)
 
+
+
+            # item pickup check (khi vào tile có item)
+            p_pos = tuple(player.pos)
+            picked = None
+            for it in items:
+                if p_pos == it["pos"]:
+                    picked = it
+                    break
+
+            if picked:
+                if picked["type"] == "coin":
+                    coins += 1
+                    items.remove(picked)
+                    # optional: play coin sound
+                elif picked["type"] == "quiz":
+                    
+                    # --- BẮT ĐẦU SỬA CHỮA VÀ CHỤP MÀN HÌNH ---
+                    
+                    # VẼ LẠI CÁC THÀNH PHẦN CHÍNH để đảm bảo ảnh chụp là mới nhất
+                    draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img, floor_img)
+                    player.draw(screen, offset_x, offset_y)
+                    hunter.draw(screen, offset_x, offset_y)
+                    
+                    # CHỤP LẠI MÀN HÌNH HIỆN TẠI
+                    background_snapshot = screen.copy()
+                    
+                    # GỌI POPUP VÀ TRUYỀN HÌNH ẢNH NỀN VÀO
+                    SKIP_COST = 10  # hoặc giá khác
+                    res = show_question_popup(coins, skip_cost=SKIP_COST, background_snapshot=background_snapshot)
+                    
+                    # --- KẾT THÚC SỬA CHỮA ---
+                    
+                    if res == "correct":
+                        keys += 1
+                    elif res == "skip":
+                        coins -= SKIP_COST
+                    # nếu wrong thì có thể apply penalty: spawn hunter closer, v.v.
+                    items.remove(picked)
+
+
             if tuple(player.pos) != prev_pos and foot_sound:
                 now = pygame.time.get_ticks()
                 if now - last_foot_play >= foot_cooldown_ms:
@@ -273,6 +347,28 @@ def game_loop(mode):
 
         player.draw(screen, offset_x, offset_y)
         hunter.draw(screen, offset_x, offset_y)
+
+        # draw items
+        for it in items:
+            r,c = it["pos"]
+            # chuyển sang tọa độ màn hình
+            if it["type"] == "coin":
+                try:
+                    coin_img = pygame.transform.scale(pygame.image.load(asset_path("coin.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE))
+                    draw_entity((r,c), coin_img, offset_x, offset_y)
+                except Exception:
+                    # fallback: vẽ hình tròn vàng
+                    x = c*CELL_SIZE - offset_x
+                    y = r*CELL_SIZE - offset_y
+                    pygame.draw.circle(screen, (212,175,55), (int(x+CELL_SIZE/2), int(y+CELL_SIZE/2)), CELL_SIZE//3)
+            else:  # quiz item
+                try:
+                    quiz_img = pygame.transform.scale(pygame.image.load(asset_path("scroll.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE))
+                    draw_entity((r,c), quiz_img, offset_x, offset_y)
+                except Exception:
+                    x = c*CELL_SIZE - offset_x
+                    y = r*CELL_SIZE - offset_y
+                    pygame.draw.rect(screen, (150,100,200), (x+CELL_SIZE*0.15, y+CELL_SIZE*0.15, CELL_SIZE*0.7, CELL_SIZE*0.7), border_radius=6)
 
         draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode)
         draw_minimap(maze, player.pos, hunter.pos, goal, panel_rect, offset_x, offset_y, MAP_W_PIX, MAP_H_PIX)

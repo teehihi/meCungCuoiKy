@@ -192,7 +192,7 @@ def draw_path(screen, path, offset_x, offset_y):
 # Tạo font riêng cho control panel
 control_font = pygame.font.Font(font_path, 22) 
 
-def draw_control_panel(view_w, view_h, paused, mode_name = ""):
+def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0):
     panel_w = 160
     panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
@@ -202,9 +202,39 @@ def draw_control_panel(view_w, view_h, paused, mode_name = ""):
         mode_label = control_font.render(f"Mode: {mode_name}", True, (255, 215, 0))
         screen.blit(mode_label, (view_w + (panel_w - mode_label.get_width()) // 2, 100))
 
-    btn_w, btn_h, gap = 120, 50, 20
+    # Giả sử mini map được vẽ ở trên control panel -> bạn xác định vị trí cuối của nó
+    minimap_bottom = 140   # ← nếu mini map cao ~100px, kết thúc ở 140px
+    y = minimap_bottom + 20
     x = view_w + 20
-    y = 160
+
+    # --- Vẽ coin và key dưới minimap ---
+    cx, cy = x, y
+    try:
+        coin_icon = pygame.transform.scale(
+            pygame.image.load(asset_path("coin.png")).convert_alpha(), (28, 28)
+        )
+        screen.blit(coin_icon, (cx, cy))
+    except Exception:
+        pygame.draw.circle(screen, (212, 175, 55), (cx + 14, cy + 14), 12)
+
+    coin_txt = font.render(f"x {coins}", True, (255, 255, 255))
+    screen.blit(coin_txt, (cx + 36, cy + 4))
+
+    ky = cy + 40
+    try:
+        key_icon = pygame.transform.scale(
+            pygame.image.load(asset_path("scroll.png")).convert_alpha(), (28, 28)
+        )
+        screen.blit(key_icon, (cx, ky))
+    except Exception:
+        pygame.draw.rect(screen, (200, 200, 0), (cx, ky, 24, 12))
+
+    key_txt = font.render(f"x {keys}", True, (255, 255, 255))
+    screen.blit(key_txt, (cx + 36, ky + 2))
+
+    # Sau coin/key mới tới các nút
+    y = ky + 60
+    btn_w, btn_h, gap = 120, 50, 20
     buttons = {}
 
     # Pause / Continue
