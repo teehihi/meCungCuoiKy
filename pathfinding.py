@@ -1,6 +1,7 @@
 from collections import deque
 import heapq
-import randomrandom
+import random
+import math
 
 # Heuristic (Manhattan distance)
 def hx(a, b):
@@ -82,9 +83,6 @@ def astar(start, goal, maze):
                     f2 = g2 + hx((nr, nc), goal)
                     heapq.heappush(pq, (f2, g2, (nr, nc), path+[(nr, nc)]))
     return []
-
-import math
-import random
 
 # Hill Climbing
 def hill_climbing(start, goal, maze, max_steps=1000):
@@ -293,4 +291,246 @@ def genetic(start, goal, maze, pop_size=50, generations=200, mutation_rate=0.1, 
     # Nếu không tìm thấy
     best = max(population, key=fitness)
     return best if best[-1] == goal else []
-    
+
+
+# AND-OR Tree Search
+def and_or_tree_search(start, goal, maze):
+    ROWS, COLS = len(maze), len(maze[0])
+
+    def successors(state):
+        r, c = state
+        next_states = []
+        for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                next_states.append((nr, nc))
+        return next_states
+
+    # Hàm đệ quy giải quyết node OR
+    def or_search(state, path):
+        if state == goal:
+            return path
+        if state in path:  # tránh vòng lặp
+            return None
+        for s in successors(state):
+            plan = and_search(s, path+[s])
+            if plan is not None:
+                return plan
+        return None
+
+    # Hàm đệ quy giải quyết node AND
+    def and_search(state, path):
+        return or_search(state, path)
+
+    # Bắt đầu từ start
+    return or_search(start, [start]) or []
+
+
+# Online DFS Search trong không gian không nhìn thấy
+def online_dfs(start, goal, maze, max_steps=1000):
+    ROWS, COLS = len(maze), len(maze[0])
+
+    # Trạng thái hiện tại
+    current = start
+    path = [current]
+
+    # Đã khám phá được các cạnh từ mỗi state
+    unexplored = {}
+    visited = set()
+
+    for _ in range(max_steps):
+        if current == goal:
+            return path
+
+        # Nếu chưa khám phá neighbors thì khám phá
+        if current not in unexplored:
+            r, c = current
+            neighbors = []
+            for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
+                nr, nc = r+dr, c+dc
+                if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                    neighbors.append((nr,nc))
+            unexplored[current] = neighbors
+
+        # Nếu còn neighbor chưa thăm → đi tiếp
+        if unexplored[current]:
+            next_state = unexplored[current].pop()
+            if next_state not in visited:
+                current = next_state
+                path.append(current)
+                visited.add(current)
+                continue
+
+        # Nếu không còn neighbor nào → quay lui
+        if len(path) > 1:
+            path.pop()
+            current = path[-1]
+        else:
+            break
+
+    return path if current == goal else []
+
+
+# Partially Observable Search (POS) - tìm kiếm trong không gian nhìn thấy một phần
+def pos(start, goal, maze, max_steps=2000):
+    ROWS, COLS = len(maze), len(maze[0])
+
+    # Bản đồ mà agent biết (khởi tạo: chỉ biết start)
+    known = {start: 0}
+    frontier = [(start, [start])]
+    visited = set()
+
+    step_count = 0
+    while frontier and step_count < max_steps:
+        state, path = frontier.pop(0)
+        step_count += 1
+
+        if state == goal:
+            return path
+
+        if state in visited:
+            continue
+        visited.add(state)
+
+        r, c = state
+
+        # Agent "nhìn thấy" các ô xung quanh (tầm nhìn = 1)
+        visible_neighbors = []
+        for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS:
+                if maze[nr][nc] == 0:  # đi được
+                    known[(nr,nc)] = 0
+                    visible_neighbors.append((nr,nc))
+
+        # Thêm vào frontier để khám phá tiếp
+        for n in visible_neighbors:
+            if n not in visited:
+                frontier.append((n, path+[n]))
+
+    return []  # nếu không tìm thấy trong max_steps
+
+# Backtracking Search
+def backtracking(start, goal, maze):
+    ROWS, COLS = len(maze), len(maze[0])
+    path = []
+    visited = set()
+
+    def bt(r, c):
+        if (r, c) == goal:
+            path.append((r, c))
+            return True
+        if (r, c) in visited:
+            return False
+        visited.add((r, c))
+        path.append((r, c))
+
+        # Thử đi 4 hướng
+        for dr, dc in [(1,0), (0,1), (-1,0), (0,-1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                if bt(nr, nc):
+                    return True
+
+        # Nếu không thành công → quay lui
+        path.pop()
+        return False
+
+    if bt(start[0], start[1]):
+        return path
+    else:
+        return []
+
+# Forward Checking Search (áp dụng cho mê cung như CSP đơn giản)
+def forwardchecking(start, goal, maze):
+    ROWS, COLS = len(maze), len(maze[0])
+    path = []
+    visited = set()
+
+    # Hàm kiểm tra domain của 1 ô (có neighbor hợp lệ không)
+    def domain_ok(r, c):
+        for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr, nc) not in visited:
+                return True
+        return False
+
+    def fc(r, c):
+        if (r, c) == goal:
+            path.append((r, c))
+            return True
+        if (r, c) in visited:
+            return False
+        visited.add((r, c))
+        path.append((r, c))
+
+        # Thử các neighbor nhưng chỉ đi nếu domain còn hợp lệ
+        for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr, nc) not in visited:
+                if domain_ok(nr, nc):  # forward checking
+                    if fc(nr, nc):
+                        return True
+
+        # Quay lui
+        path.pop()
+        return False
+
+    if fc(start[0], start[1]):
+        return path
+    else:
+        return []
+
+# AC-3 (Arc Consistency)
+def ac3(start, goal, maze):
+    ROWS, COLS = len(maze), len(maze[0])
+
+    # Domain: mỗi node có domain {0} (đi được) hoặc rỗng nếu tường
+    domains = {}
+    for r in range(ROWS):
+        for c in range(COLS):
+            if maze[r][c] == 0:
+                domains[(r,c)] = {0}  # đi được
+            else:
+                domains[(r,c)] = set()  # không đi được
+
+    # Constraint: một node và neighbor đều phải có domain khác rỗng
+    def neighbors(r,c):
+        for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < ROWS and 0 <= nc < COLS:
+                yield (nr,nc)
+
+    # Arc ban đầu: tất cả cặp (X,Y) với Y là neighbor của X
+    queue = deque()
+    for r in range(ROWS):
+        for c in range(COLS):
+            for n in neighbors(r,c):
+                queue.append(((r,c), n))
+
+    # Revise: loại giá trị khỏi domain[x] nếu không còn giá trị nào ở domain[y] hỗ trợ nó
+    def revise(x, y):
+        removed = False
+        if not domains[y]:  # nếu domain y rỗng thì x cũng không còn hợp lệ
+            if domains[x]:
+                domains[x].clear()
+                removed = True
+        return removed
+
+    # AC-3 main loop
+    while queue:
+        (x, y) = queue.popleft()
+        if revise(x, y):
+            if not domains[x]:
+                continue
+            for n in neighbors(*x):
+                if n != y:
+                    queue.append((n, x))
+
+    # Sau khi AC-3, nếu start hoặc goal rỗng domain => không có đường
+    if not domains.get(start, set()) or not domains.get(goal, set()):
+        return []
+
+    # Nếu còn hợp lệ → chạy BFS/A* để tìm đường đi
+    return bfs(start, goal, maze)
+
