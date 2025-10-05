@@ -534,3 +534,71 @@ def ac3(start, goal, maze):
     # Nếu còn hợp lệ → chạy BFS/A* để tìm đường đi
     return bfs(start, goal, maze)
 
+
+# Minimax Search (Thuật toán Minimax cơ bản)
+def minimax(state, depth, maximizing_player, get_children, evaluate, is_terminal):
+    # Nếu đạt độ sâu giới hạn hoặc node là terminal → trả về giá trị heuristic
+    if depth == 0 or is_terminal(state):
+        return evaluate(state)
+
+    # Lượt của MAX → chọn giá trị lớn nhất
+    if maximizing_player:
+        max_eval = float('-inf')
+        for child in get_children(state):
+            eval = minimax(child, depth - 1, False, get_children, evaluate, is_terminal)
+            max_eval = max(max_eval, eval)
+        return max_eval
+
+    # Lượt của MIN → chọn giá trị nhỏ nhất
+    else:
+        min_eval = float('inf')
+        for child in get_children(state):
+            eval = minimax(child, depth - 1, True, get_children, evaluate, is_terminal)
+            min_eval = min(min_eval, eval)
+        return min_eval
+
+
+# Alpha-Beta Pruning (Thuật toán Cắt tỉa Alpha–Beta)
+def alphabeta(state, depth, alpha, beta, maximizing_player, get_children, evaluate, is_terminal):
+    # Nếu đạt độ sâu giới hạn hoặc node là terminal → trả về giá trị heuristic
+    if depth == 0 or is_terminal(state):
+        return evaluate(state)
+
+    # Lượt của MAX → cố gắng tăng alpha
+    if maximizing_player:
+        max_eval = float('-inf')
+        for child in get_children(state):
+            eval = alphabeta(child, depth - 1, alpha, beta, False, get_children, evaluate, is_terminal)
+            max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break  # Cắt tỉa (prune)
+        return max_eval
+
+    # Lượt của MIN → cố gắng giảm beta
+    else:
+        min_eval = float('inf')
+        for child in get_children(state):
+            eval = alphabeta(child, depth - 1, alpha, beta, True, get_children, evaluate, is_terminal)
+            min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break  # Cắt tỉa (prune)
+        return min_eval
+
+# Biến thể của minimax - Giới hạn độ sâu ( để tránh lặp vô hạn) 
+def minimax_limited(state, depth, maximizing_player, get_children, evaluate, is_terminal):
+    if depth == 0 or is_terminal(state):
+        return evaluate(state)
+    if maximizing_player:
+        max_eval = float('-inf')
+        for child in get_children(state):
+            eval = minimax_limited(child, depth - 1, False, get_children, evaluate, is_terminal)
+            max_eval = max(max_eval, eval)
+        return max_eval
+    else:
+        min_eval = float('inf')
+        for child in get_children(state):
+            eval = minimax_limited(child, depth - 1, True, get_children, evaluate, is_terminal)
+            min_eval = min(min_eval, eval)
+        return min_eval
