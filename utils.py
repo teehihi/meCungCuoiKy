@@ -1,5 +1,5 @@
 import pygame, os, random, math
-from pathfinding import bfs, dfs, greedy, astar
+from pathfinding import *
 from collections import deque
 from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
@@ -22,7 +22,7 @@ screen = pygame.display.set_mode((1, 1))
 # Tải fonts và hình ảnh chung
 font_path = asset_path("font/Pixeboy.ttf")
 font = pygame.font.SysFont("Segoe UI", 22)
-big_font = pygame.font.SysFont("Segoe UI", 48, bold=True)
+big_font = pygame.font.SysFont("Segoe UI", 48)
 menu_font = pygame.font.Font(font_path, 80)
 treasure_img = pygame.transform.scale(pygame.image.load(asset_path("treasure.png")).convert_alpha(), (CELL_SIZE, CELL_SIZE))
 clock = pygame.time.Clock()
@@ -198,8 +198,14 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, li
 
     # --- Hiển thị chế độ chơi ---
     if mode_name:
-        mode_label = control_font.render(f"Mode: {mode_name}", True, (255, 215, 0))
-        screen.blit(mode_label, (view_w + (panel_w - mode_label.get_width()) // 2, 100))
+        max_width = panel_w - 20
+        display_name = mode_name
+        while control_font.render(f"Mode: {display_name}", True, (255, 215, 0)).get_width() > max_width:
+            display_name = display_name[:-1]
+        if len(display_name) < len(mode_name):
+            display_name = display_name[:-3] + "..."
+        text_surface = control_font.render(f"Mode: {display_name}", True, (255, 215, 0))
+        screen.blit(text_surface, (view_w + 10, view_h - text_surface.get_height() - 20))
 
     minimap_bottom = 140
     # y là vị trí bắt đầu của mục đầu tiên (Lives)
