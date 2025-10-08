@@ -27,7 +27,7 @@ def asset_path(filename):
     return os.path.join(BASE_DIR, "assets", filename)
 
 # Các themes có sẵn
-available_themes = ["sand", "snow", "water", "blue", "brown", "white", "yellow","hell"]
+available_themes = ["sand", "snow", "water", "blue", "brown", "white", "yellow","hell","conan"]
 
 # ================= PATH TILE =================
 try:

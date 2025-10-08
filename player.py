@@ -2,51 +2,65 @@ import pygame
 from constants import CELL_SIZE, player_speed, asset_path
 from utils import load_spritesheet_rows
 
-# --- CẬP NHẬT: TẢI CẢ HAI SPRITESHEET RIÊNG BIỆT ---
+# --- CẬP NHẬT: KHAI BÁO BIẾN TRƯỚC ---
+player_animations = {}
+player_hit_animations = {}
 
-# Thời gian player bị nhấp nháy đỏ khi bị chạm (1 giây)
-HIT_STUN_DURATION = 1000 
-# Tốc độ nhấp nháy: đổi sprite mỗi 6 frame (30fps/6 = 5 lần/giây)
-FLICKER_SPEED = 6 
+HIT_STUN_DURATION = 1000
+FLICKER_SPEED = 6
 
-# Khai báo keys theo thứ tự hàng:
 direction_keys = ["down", "left", "right", "up"]
 
-# 1. Tải spritesheet BÌNH THƯỜNG (player_run.png)
-# Giả định player_run.png là 4x8 (như code gốc của bạn)
-try:
-    sprite_rows_normal, sprite_cols_normal = 4, 8
-    player_frames_normal = load_spritesheet_rows(asset_path("player_run.png"), 64, 64, sprite_rows_normal, sprite_cols_normal)
-    
-    player_animations = {}  # Trạng thái Bình thường (Normal)
-    for i, direction in enumerate(direction_keys):
-        # Giữ lại logic ban đầu cho player_run.png
-        player_animations[direction] = player_frames_normal[i]
+# --- HÀM TẢI SPRITE THEO THEME (ĐÃ CẬP NHẬT) ---
+def load_player_theme_sprites(theme):
+    """
+    Tải spritesheet của player dựa vào theme được chọn.
+    Bao gồm cả sprite thường (run) và sprite bị trúng đòn (hit).
+    """
+    global player_animations, player_hit_animations
 
-except Exception:
-    print("Lỗi tải player_run.png!")
-    player_animations = {}
+    # ---- Chọn file sprite theo theme ----
+    if theme == "conan":
+        player_sprite_filename = "player_run_conan.png"
+        player_hit_filename = "player_hit_conan.png"
+    else:
+        player_sprite_filename = "player_run.png"
+        player_hit_filename = "player_hit.png"
 
-# 2. Tải spritesheet BỊ ĐAU (Swordsman_lvl2_Hurt_with_shadow.png)
-# Spritesheet đỏ là 4x5, chúng ta chỉ cần một frame đỏ cho mỗi hướng (ví dụ: cột 3/index 3)
-try:
-    sprite_rows_hit, sprite_cols_hit = 4, 5
-    # Tải tệp chứa sprite đỏ (Sử dụng tên file đã gửi)
-    player_frames_hit = load_spritesheet_rows(asset_path("player_hit.png"), 64, 64, sprite_rows_hit, sprite_cols_hit)
-    
-    player_hit_animations = {} # Trạng thái Bị đau (Hit/Red)
-    for i, direction in enumerate(direction_keys):
-        # Lấy frame đỏ nhất (Cột 3/index 3)
-        if sprite_cols_hit >= 4:
-            player_hit_animations[direction] = [player_frames_hit[i][3]] 
-        else:
-            # Fallback nếu tệp không đúng cấu trúc 4x5
-            player_hit_animations[direction] = [player_frames_hit[i][0]] 
+    # ---- 1. Tải spritesheet THƯỜNG ----
+    try:
+        sprite_rows, sprite_cols = 4, 8
+        player_frames_normal = load_spritesheet_rows(
+            asset_path(player_sprite_filename), 64, 64, sprite_rows, sprite_cols
+        )
+        player_animations = {}
+        for i, direction in enumerate(direction_keys):
+            player_animations[direction] = player_frames_normal[i]
+    except Exception as e:
+        print(f"Lỗi tải {player_sprite_filename}: {e}")
+        player_animations = {d: [] for d in direction_keys}
 
-except Exception:
-    print("Lỗi tải sprite bị đau. Dùng sprite thường làm fallback.")
-    player_hit_animations = player_animations # Fallback nếu không tải được sprite đỏ
-# -------------------------------------------------------------
+    # ---- 2. Tải spritesheet BỊ ĐAU ----
+    try:
+        sprite_rows_hit, sprite_cols_hit = 4, 5
+        player_frames_hit = load_spritesheet_rows(
+            asset_path(player_hit_filename), 64, 64, sprite_rows_hit, sprite_cols_hit
+        )
+
+        player_hit_animations = {}
+        for i, direction in enumerate(direction_keys):
+            # Nếu spritesheet có >=4 cột thì chọn frame thứ 3 (vì màu đỏ dễ thấy)
+            if sprite_cols_hit >= 4:
+                player_hit_animations[direction] = [player_frames_hit[i][3]]
+            else:
+                player_hit_animations[direction] = [player_frames_hit[i][0]]
+
+    except Exception as e:
+        print(f"Lỗi tải {player_hit_filename}: {e}. Dùng sprite thường làm fallback.")
+        player_hit_animations = player_animations
+
+
+# ------------------------------------------------------------------
 
 class Player:
     def __init__(self, start_pos, initial_lives=5):
@@ -73,6 +87,7 @@ class Player:
         self.flicker_counter = 0      
         # ----------------------------------------
 
+    # ... (Phần còn lại của class Player giữ nguyên, không cần thay đổi)
     @property
     def pos(self):
         return self.grid_pos
@@ -142,7 +157,8 @@ class Player:
         if self.frame_timer >= animation_speed:
             # Animation luôn dựa trên độ dài của animation BÌNH THƯỜNG
             # Đảm bảo self.frame_index không vượt quá frames của player_animations
-            self.frame_index = (self.frame_index + 1) % len(player_animations[self.direction])
+            if player_animations[self.direction]: # Kiểm tra list không rỗng
+                self.frame_index = (self.frame_index + 1) % len(player_animations[self.direction])
             self.frame_timer = 0
         self.last_direction = self.direction
 
@@ -152,27 +168,27 @@ class Player:
         # 1. KIỂM TRA HIỆU ỨNG BỊ ĐAU
         if now < self.hit_stun_timer:
             self.flicker_counter += 1
-            # Hiệu ứng nhấp nháy: chuyển đổi giữa sprite bình thường và sprite đỏ
-            # Khi (flicker_counter / FLICKER_SPEED) chẵn -> dùng thường, lẻ -> dùng hit
             if (self.flicker_counter // FLICKER_SPEED) % 2 == 0:
-                # Sử dụng animation BÌNH THƯỜNG (sprite player_run.png)
                 current_animations = player_animations 
             else:
-                # Sử dụng animation BỊ ĐAU (sprite Swordsman_lvl2_Hurt_with_shadow.png)
                 current_animations = player_hit_animations
             
-            # Nếu đang ở trạng thái HIT, frame_index phải được giới hạn theo frames hiện tại
-            # (player_hit_animations chỉ có 1 frame)
-            frames = current_animations.get(self.direction, current_animations["down"])
-            img = frames[self.frame_index % len(frames)]
+            frames = current_animations.get(self.direction, current_animations.get("down", []))
+            if frames:
+                img = frames[self.frame_index % len(frames)]
+            else:
+                return # Không vẽ gì nếu không có frame
             
         else:
             # Player bình thường
             current_animations = player_animations
             self.flicker_counter = 0
             
-            frames = current_animations.get(self.direction, current_animations["down"])
-            img = frames[self.frame_index % len(frames)]
+            frames = current_animations.get(self.direction, current_animations.get("down", []))
+            if frames:
+                img = frames[self.frame_index % len(frames)]
+            else:
+                return # Không vẽ gì nếu không có frame
         
         # Vẽ lên màn hình
         x = self.pixel_pos[0] - offset_x

@@ -7,10 +7,10 @@ from constants import (
 )
 from PIL import Image, ImageFilter
 import numpy as np
+from io import BytesIO
 
-from background import ScrollingBackground 
+from background import ScrollingBackground
 from constants import CELL_SIZE, VIEWPORT_W, VIEWPORT_H, path_tile
-
 
 # Khởi tạo Pygame và màn hình ban đầu
 pygame.init()
@@ -29,37 +29,177 @@ clock = pygame.time.Clock()
 path_tile = pygame.image.load(asset_path("path.png")).convert_alpha()
 path_tile = pygame.transform.scale(path_tile, (CELL_SIZE, CELL_SIZE))
 
-# Các hàm tải sprites và assets
-def load_spritesheet_rows(path, frame_width, frame_height, rows, cols):
-    sheet = pygame.image.load(path).convert_alpha()
-    frames_by_row = []
-    for r in range(rows):
-        row_frames = []
-        for c in range(cols):
-            rect = pygame.Rect(c*frame_width, r*frame_height, frame_width, frame_height)
-            frame = sheet.subsurface(rect).copy()
-            try:
-                crop = frame.subsurface(pygame.Rect(8, 8, frame_width-16, frame_height-16)).copy()
-            except Exception:
-                crop = frame
-            row_frames.append(pygame.transform.scale(crop, (CELL_SIZE, CELL_SIZE)))
-        frames_by_row.append(row_frames)
-    return frames_by_row
+# --- KHAI BÁO BIẾN LƯU FRAME ANIMATION ---
+animated_coin_frames = []
+animated_key_frames = []
+animated_coin_icon_frames = []
+animated_key_icon_frames = []
 
-def load_spritesheet_flat(path, frame_width, frame_height, rows, cols):
-    sheet = pygame.image.load(path).convert_alpha()
-    frames = []
-    for r in range(rows):
-        for c in range(cols):
-            rect = pygame.Rect(c*frame_width, r*frame_height, frame_width, frame_height)
-            frame = sheet.subsurface(rect).copy()
-            try:
-                crop = frame.subsurface(pygame.Rect(8, 8, frame_width-16, frame_height-16)).copy()
-            except Exception:
-                crop = frame
-            frames.append(pygame.transform.scale(crop, (CELL_SIZE, CELL_SIZE)))
-    return frames
+# ----------------------------
+# 🧩 HÀM HỖ TRỢ CẮT VIỀN TRONG SUỐT
+# ----------------------------
+def crop_transparent_borders(surface):
+    """Tự động cắt vùng trong suốt xung quanh hình bằng Pillow."""
+    try:
+        width, height = surface.get_size()
+        raw_str = pygame.image.tostring(surface, "RGBA", False)
+        pil_img = Image.frombytes("RGBA", (width, height), raw_str)
+        bbox = pil_img.getbbox()
+        if bbox:
+            pil_cropped = pil_img.crop(bbox)
+            cropped_str = pil_cropped.tobytes("raw", "RGBA")
+            cropped_surf = pygame.image.fromstring(cropped_str, pil_cropped.size, "RGBA")
+            return cropped_surf
+        return surface
+    except Exception as e:
+        print(f"⚠️ Error cropping transparent borders: {e}")
+        return surface
 
+# --- HÀM HỖ TRỢ CĂN CHỈNH SPRITE ---
+def create_centered_surface(source_surface, scale_factor=0.9, nudge=(0, 0)):
+    """
+    Tạo một surface mới bằng CELL_SIZE, chứa source_surface đã được scale và căn giữa.
+    Thêm tham số 'nudge' để tinh chỉnh vị trí.
+    """
+    pixel_size = int(CELL_SIZE * scale_factor)
+    
+    original_w, original_h = source_surface.get_size()
+    if original_w > original_h:
+        new_w = pixel_size
+        new_h = int(original_h * (new_w / original_w))
+    else:
+        new_h = pixel_size
+        new_w = int(original_w * (new_h / original_h))
+
+    scaled_image = pygame.transform.scale(source_surface, (new_w, new_h))
+    
+    container = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+    
+    x_offset = (CELL_SIZE - new_w) // 2 + nudge[0]
+    y_offset = (CELL_SIZE - new_h) // 2 + nudge[1]
+    
+    container.blit(scaled_image, (x_offset, y_offset))
+    return container
+
+# ----------------------------
+# CÁC HÀM TẢI SPRITE
+# ----------------------------
+def load_spritesheet_rows(path, frame_width, frame_height, rows, cols, crop_margin=8):
+    try:
+        sheet = pygame.image.load(path).convert_alpha()
+        frames_by_row = []
+        
+        for r in range(rows):
+            row_frames = []
+            for c in range(cols):
+                rect = pygame.Rect(c * frame_width, r * frame_height, frame_width, frame_height)
+                frame = sheet.subsurface(rect).copy()
+                
+                cropped_frame = crop_transparent_borders(frame)
+                centered_frame = create_centered_surface(cropped_frame, scale_factor=0.8)
+                row_frames.append(centered_frame)
+            frames_by_row.append(row_frames)
+        return frames_by_row
+    except Exception as e:
+        print(f"⚠️ Error loading spritesheet {path}: {e}")
+        return []
+
+def load_spritesheet_flat(path, frame_width, frame_height, rows, cols, spacing_x=0):
+    """Nâng cấp: Thêm spacing_x để xử lý khoảng trống giữa các frame."""
+    try:
+        sheet = pygame.image.load(path).convert_alpha()
+        frames = []
+        for r in range(rows):
+            for c in range(cols):
+                x = c * (frame_width + spacing_x)
+                y = r * frame_height
+                rect = pygame.Rect(x, y, frame_width, frame_height)
+                frame = sheet.subsurface(rect).copy()
+                frames.append(frame)
+        return frames
+    except Exception as e:
+        print(f"⚠️ Error loading flat spritesheet {path}: {e}")
+        return []
+
+# ----------------------------
+# 🪙 LOAD ANIMATION COIN + KEY
+# ----------------------------
+def load_equal_frames(sheet_path, num_frames, scale_factor):
+    """Tự động chia sprite sheet thành num_frames khung bằng nhau"""
+    full_path = asset_path(sheet_path)
+    try:
+        if not os.path.exists(full_path):
+            raise FileNotFoundError(f"Sprite sheet not found at {full_path}")
+        sheet = pygame.image.load(full_path).convert_alpha()
+        sheet_w, sheet_h = sheet.get_size()
+        frame_w = sheet_w // num_frames
+        if frame_w == 0:
+            raise ValueError(f"Invalid sprite sheet width {sheet_w} for {num_frames} frames")
+        frame_h = sheet_h  # 1 hàng
+        frames = []
+        for i in range(num_frames):
+            rect = pygame.Rect(i * frame_w, 0, frame_w, frame_h)
+            frame = sheet.subsurface(rect).copy()
+            frame_centered = create_centered_surface(frame, scale_factor=scale_factor)
+            frames.append(frame_centered)
+        print(f"✅ Successfully loaded {num_frames} frames from {sheet_path}")
+        return frames
+    except Exception as e:
+        print(f"⚠️ Error loading sprite sheet {full_path}: {e}")
+        return []
+
+def load_coin_sprites(theme="default"):
+    """Load animation frames cho đồng xu. Nếu theme == 'conan' (case-insensitive) sẽ dùng aptx_anim.png."""
+    global animated_coin_frames, animated_coin_icon_frames
+    ICON_SIZE = 24
+    try:
+        sheet_name = "aptx_anim.png" if str(theme).lower() == "conan" else "coin_anim.png"
+        print(f"[utils] Loading coin spritesheet: {sheet_name}")
+        animated_coin_frames = load_equal_frames(sheet_name, num_frames=8, scale_factor=0.75)
+        if not animated_coin_frames:
+            raise Exception(f"No frames loaded from {sheet_name}")
+        animated_coin_icon_frames = [
+            pygame.transform.smoothscale(f, (ICON_SIZE, ICON_SIZE)) for f in animated_coin_frames
+        ]
+        print(f"✅ Coin sprites loaded ({sheet_name})")
+    except Exception as e:
+        print(f"⚠️ Error loading coin sprites ({theme}): {e}")
+        # Fallback placeholder (vẫn đảm bảo có ICON_SIZE)
+        placeholder = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+        pygame.draw.circle(placeholder, (212, 175, 55), (CELL_SIZE // 2, CELL_SIZE // 2), CELL_SIZE // 2)
+        animated_coin_frames = [placeholder] * 8
+        animated_coin_icon_frames = [
+            pygame.transform.smoothscale(placeholder, (ICON_SIZE, ICON_SIZE)) for _ in range(8)
+        ]
+
+
+def load_key_sprites(theme="default"):
+    """Load animation frames cho key/quiz item. Nếu theme == 'conan' sẽ dùng find_anim.png."""
+    global animated_key_frames, animated_key_icon_frames
+    ICON_SIZE = 24
+    try:
+        sheet_name = "find_anim.png" if str(theme).lower() == "conan" else "key_anim.png"
+        print(f"[utils] Loading key spritesheet: {sheet_name}")
+        animated_key_frames = load_equal_frames(sheet_name, num_frames=8, scale_factor=0.8)
+        if not animated_key_frames:
+            raise Exception(f"No frames loaded from {sheet_name}")
+        animated_key_icon_frames = [
+            pygame.transform.smoothscale(f, (ICON_SIZE, ICON_SIZE)) for f in animated_key_frames
+        ]
+        print(f"✅ Key sprites loaded ({sheet_name})")
+    except Exception as e:
+        print(f"⚠️ Error loading key sprites ({theme}): {e}")
+        # Fallback placeholder
+        placeholder = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+        pygame.draw.rect(placeholder, (200, 200, 0), (CELL_SIZE // 4, CELL_SIZE // 4, CELL_SIZE // 2, CELL_SIZE // 2))
+        animated_key_frames = [placeholder] * 8
+        animated_key_icon_frames = [
+            pygame.transform.smoothscale(placeholder, (ICON_SIZE, ICON_SIZE)) for _ in range(8)
+        ]
+
+# ----------------------------
+# LOAD THEME
+# ----------------------------
 def load_theme(theme_name):
     theme_dir = os.path.join(asset_path("ruin"), theme_name)
     wall_images = []
@@ -67,8 +207,10 @@ def load_theme(theme_name):
         for fname in os.listdir(theme_dir):
             if fname.lower().endswith((".png", ".jpg")) and not fname.startswith("bg_"):
                 img = pygame.image.load(os.path.join(theme_dir, fname)).convert_alpha()
-                img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
-                wall_images.append(img)
+                cropped_img = crop_transparent_borders(img)
+                centered_img = create_centered_surface(cropped_img, scale_factor=0.95)
+                wall_images.append(centered_img)
+
     bg_path = os.path.join(theme_dir, f"bg_{theme_name}.png")
     if os.path.exists(bg_path):
         bg_img = pygame.transform.scale(pygame.image.load(bg_path).convert(), (CELL_SIZE, CELL_SIZE))
@@ -80,16 +222,17 @@ def load_theme(theme_name):
             bg_img = pygame.Surface((CELL_SIZE, CELL_SIZE))
             bg_img.fill((50, 50, 50))
     
-    # Thêm logic tải hình ảnh road ở đây
     road_path = asset_path(f"road/road_{theme_name}.png")
     if not os.path.exists(road_path):
         road_path = asset_path("road/road_white.png")
         
     road_img = pygame.transform.scale(pygame.image.load(road_path).convert(), (CELL_SIZE, CELL_SIZE))
     
+    # Load coin and key sprites for the theme
+    load_coin_sprites(theme=theme_name)
+    load_key_sprites(theme=theme_name)
+    
     return wall_images, bg_img, road_img
-
-# Các hàm tạo maze
 def generate_maze(width, height):
     if width % 2 == 0: width += 1
     if height % 2 == 0: height += 1
@@ -131,7 +274,6 @@ def farthest_cell(maze, start):
                 q.append(((nr,nc), d+1))
     return farthest
 
-# Các hàm vẽ UI
 def clamp(v, a, b):
     return max(a, min(b, v))
 
@@ -143,7 +285,6 @@ def draw_button(rect, text, color):
     screen.blit(label, (rect.centerx - label.get_width() // 2,
                         rect.centery - label.get_height() // 2))
 
-# Thay đổi hàm draw_maze để nhận floor_img từ tham số
 def draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img, floor_img):
     rows, cols = len(maze), len(maze[0])
     start_col = max(0, int(offset_x) // CELL_SIZE)
@@ -188,7 +329,6 @@ def draw_path(screen, path, offset_x, offset_y):
         y = r * CELL_SIZE - offset_y
         screen.blit(path_tile, (x, y))
 
-# Tạo font riêng cho control panel
 control_font = pygame.font.Font(font_path, 22) 
 
 def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, lives=5):
@@ -196,7 +336,6 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, li
     panel_rect = pygame.Rect(view_w, 0, panel_w, view_h)
     pygame.draw.rect(screen, (40, 40, 40), panel_rect)
 
-    # --- Hiển thị chế độ chơi ---
     if mode_name:
         max_width = panel_w - 20
         display_name = mode_name
@@ -208,72 +347,67 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, li
         screen.blit(text_surface, (view_w + 10, view_h - text_surface.get_height() - 20))
 
     minimap_bottom = 140
-    # y là vị trí bắt đầu của mục đầu tiên (Lives)
     y = minimap_bottom + 20
     x = view_w + 20
     
-    # KHOẢNG CÁCH DỌC GIỮA CÁC MỤC
     ITEM_GAP = 40 
-
-    # --- CẤU HÌNH FRAME ---
-    padding = 10
     icon_size = 28
-    num_items = 3
-    frame_w = padding * 2 + icon_size + 36 + 20  # icon + text + padding
-    frame_h = padding * 2 + num_items * icon_size + (num_items - 1) * (ITEM_GAP - icon_size)
-    frame_x, frame_y = x - padding, y - padding
 
-    # VẼ NỀN VÀ VIỀN FRAME
-    pygame.draw.rect(screen, (40, 40, 40), (frame_x, frame_y, frame_w, frame_h))          # nền
-    pygame.draw.rect(screen, (255, 255, 255), (frame_x, frame_y, frame_w, frame_h), 2)    # viền trắng
+    num_frames = len(animated_coin_icon_frames) if animated_coin_icon_frames else 1
+    anim_speed_ms = 150
+    current_frame_index = (pygame.time.get_ticks() // anim_speed_ms) % num_frames
 
-    # --- VẼ LIVES ---
+    padding = 10
+    frame_w = panel_w - 20 
+    frame_h = 130 
+    frame_x, frame_y = view_w + 10, y - padding
+    pygame.draw.rect(screen, (30, 30, 30), (frame_x, frame_y, frame_w, frame_h), border_radius=8)
+    pygame.draw.rect(screen, (80, 80, 80), (frame_x, frame_y, frame_w, frame_h), 2, border_radius=8)
+
     lx, ly = x, y
+
     try:
-        life_icon = pygame.transform.scale(
+        life_icon_surf = pygame.transform.scale(
             pygame.image.load(asset_path("heart.png")).convert_alpha(), (icon_size, icon_size)
         )
-        screen.blit(life_icon, (lx, ly))
+        life_icon_rect = life_icon_surf.get_rect(topleft=(lx, ly))
+        screen.blit(life_icon_surf, life_icon_rect)
     except Exception:
-        pygame.draw.circle(screen, (200, 50, 50), (lx + icon_size//2, ly + icon_size//2), icon_size//2)
+        life_icon_rect = pygame.Rect(lx, ly, icon_size, icon_size)
+        pygame.draw.circle(screen, (200, 50, 50), life_icon_rect.center, icon_size//2)
+    
+    life_txt_surf = font.render(f"x {lives}", True, (255, 255, 255))
+    life_txt_rect = life_txt_surf.get_rect(left = life_icon_rect.right + 8, centery = life_icon_rect.centery)
+    screen.blit(life_txt_surf, life_txt_rect)
 
-    life_txt = font.render(f"x {lives}", True, (255, 255, 255))
-    screen.blit(life_txt, (lx + icon_size + 6, ly + 4))
-
-    # --- VẼ COIN ---
     cy = ly + ITEM_GAP
-    try:
-        coin_icon = pygame.transform.scale(
-            pygame.image.load(asset_path("coin.png")).convert_alpha(), (icon_size, icon_size)
-        )
-        screen.blit(coin_icon, (x, cy))
-    except Exception:
-        pygame.draw.circle(screen, (212, 175, 55), (x + icon_size//2, cy + icon_size//2), icon_size//2)
+    coin_icon_rect = pygame.Rect(x, cy, icon_size, icon_size)
+    if animated_coin_icon_frames:
+        current_coin_frame = animated_coin_icon_frames[current_frame_index]
+        screen.blit(current_coin_frame, coin_icon_rect.topleft)
+    else:
+        pygame.draw.circle(screen, (212, 175, 55), coin_icon_rect.center, icon_size//2)
 
-    coin_txt = font.render(f"x {coins}", True, (255, 255, 255))
-    screen.blit(coin_txt, (x + icon_size + 6, cy + 4))
+    coin_txt_surf = font.render(f"x {coins}", True, (255, 255, 255))
+    coin_txt_rect = coin_txt_surf.get_rect(left = coin_icon_rect.right + 8, centery = coin_icon_rect.centery)
+    screen.blit(coin_txt_surf, coin_txt_rect)
 
-    # --- VẼ KEY ---
     ky = cy + ITEM_GAP
-    try:
-        key_icon = pygame.transform.scale(
-            pygame.image.load(asset_path("scroll.png")).convert_alpha(), (icon_size, icon_size)
-        )
-        screen.blit(key_icon, (x, ky))
-    except Exception:
+    key_icon_rect = pygame.Rect(x, ky, icon_size, icon_size)
+    if animated_key_icon_frames:
+        current_key_frame = animated_key_icon_frames[current_frame_index]
+        screen.blit(current_key_frame, key_icon_rect.topleft)
+    else:
         pygame.draw.rect(screen, (200, 200, 0), (x, ky + icon_size//4, icon_size, icon_size//2))
 
-    key_txt = font.render(f"x {keys}", True, (255, 255, 255))
-    screen.blit(key_txt, (x + icon_size + 6, ky + 4))
+    key_txt_surf = font.render(f"x {keys}", True, (255, 255, 255))
+    key_txt_rect = key_txt_surf.get_rect(left = key_icon_rect.right + 8, centery = key_icon_rect.centery)
+    screen.blit(key_txt_surf, key_txt_rect)
 
-
-    # 4. --- NÚT ĐIỀU KHIỂN (BẮT ĐẦU TẠI y=240 + 60 = 300) ---
-    y = ky + 60
+    y = frame_y + frame_h + 20
     btn_w, btn_h, gap = 120, 50, 20
+    x = view_w + (panel_w - btn_w) // 2
     buttons = {}
-
-    # Pause / Continue
-    # ... (code vẽ nút Pause/Continue) ...
     if not paused:
         pause_btn = pygame.Rect(x, y, btn_w, btn_h)
         draw_control_button(pause_btn, "Pause", (80, 80, 200))
@@ -283,50 +417,28 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, li
         draw_control_button(cont_btn, "Continue", (50, 180, 100))
         buttons["continue"] = cont_btn
     y += btn_h + gap
-
-    # Reset
-    # ... (code vẽ nút Reset) ...
     reset_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(reset_btn, "Reset", (200, 150, 50))
     buttons["reset"] = reset_btn
     y += btn_h + gap
-
-    # Surrender
-    # ... (code vẽ nút Surrender) ...
     surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(surrender_btn, "Surrender", (200, 60, 60))
     buttons["surrender"] = surrender_btn
-
     return buttons, panel_w
 
 def get_control_buttons(paused):
     btn_w, btn_h, gap = 120, 50, 20
     x = VIEWPORT_W + 20
-    
-    # Trong draw_control_panel:
-    # Lives = 140 + 20 = 160
-    # Coins = 160 + 40 = 200
-    # Keys = 200 + 40 = 240
-    # Nút bắt đầu: Keys + 60 = 240 + 60 = 300
-    y = 300 # <--- ĐIỀU CHỈNH VỊ TRÍ BẮT ĐẦU CỦA NÚT
-    # -----------------------------------------------------------
-    
+    y = 300
     buttons = {}
     if not paused:
-        pause_btn = pygame.Rect(x, y, btn_w, btn_h)
-        buttons["pause"] = pause_btn
+        buttons["pause"] = pygame.Rect(x, y, btn_w, btn_h)
     else:
-        cont_btn = pygame.Rect(x, y, btn_w, btn_h)
-        buttons["continue"] = cont_btn
+        buttons["continue"] = pygame.Rect(x, y, btn_w, btn_h)
     y += btn_h + gap
-
-    reset_btn = pygame.Rect(x, y, btn_w, btn_h)
-    buttons["reset"] = reset_btn
+    buttons["reset"] = pygame.Rect(x, y, btn_w, btn_h)
     y += btn_h + gap
-
-    surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
-    buttons["surrender"] = surrender_btn
-
+    buttons["surrender"] = pygame.Rect(x, y, btn_w, btn_h)
     return buttons
 
 def draw_control_button(rect, text, color):
@@ -337,256 +449,155 @@ def draw_control_button(rect, text, color):
 
 def loading_screen():
     screen = pygame.display.set_mode((600, 400))
-   
-    # Font title
     title_font = pygame.font.Font(font_path, 40)  
     tip_font = pygame.font.SysFont("segoeui", 22, bold = True)
     bar_font = pygame.font.SysFont("segoeui", 20)
-
-    # Load ảnh nền, scale theo chiều cao (400)
     bg_img = pygame.image.load(asset_path("background.png")).convert()
     bg_width, bg_height = bg_img.get_size()
     scale_factor = 400 / bg_height
     bg_width_scaled = int(bg_width * scale_factor)
     bg_img = pygame.transform.scale(bg_img, (bg_width_scaled, 400))
-
     scroll_x = 0
-    speed = 0.3  # chậm lại cho mượt
-
+    speed = 0.3
     progress = 0
     tip_text = random.choice([
         "Mẹo: Hunter luôn đuổi theo bạn!",
         "Mẹo: Dùng phím mũi tên để di chuyển.",
         "Mỗi màn có bản đồ khác nhau.",
     ])
-
     running = True
     while running:
-        # Vẽ background cuộn ngang
         scroll_x -= speed
         if scroll_x <= -bg_width_scaled:
             scroll_x = 0
-
         screen.blit(bg_img, (scroll_x, 0))
         screen.blit(bg_img, (scroll_x + bg_width_scaled, 0))
-
-        # Overlay làm mờ
         overlay = pygame.Surface((600, 400))
         overlay.set_alpha(120)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
-
-        # Title (màu vàng sáng)
         title = title_font.render("Loading Maze Hunter...", True, (255, 215, 0))
         screen.blit(title, (300 - title.get_width() // 2, 100))
-
-        # Thanh progress
         bar_w, bar_h, bar_x, bar_y = 400, 30, 100, 200
         pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 3)
         pygame.draw.rect(
-            screen, (50, 255, 120),  # xanh neon
+            screen, (50, 255, 120),
             (bar_x + 3, bar_y + 3, int(progress * (bar_w - 6)), bar_h - 6)
         )
         bar_label = bar_font.render(f"{int(progress*100)}%", True, (255, 255, 0))
         screen.blit(bar_label, (300 - bar_label.get_width() // 2, bar_y + bar_h + 10))
-
-        # Hint text (Segoe UI, vàng nhạt)
         hint = tip_font.render(tip_text, True, (255, 220, 100))
         screen.blit(hint, (300 - hint.get_width() // 2, 280))
-
         pygame.display.flip()
         clock.tick(60)
-
-        # Tăng tiến độ
         progress += 0.006
         if progress >= 1:
             running = False
 
-
 def transition_screen(text, color=(255, 215, 0)):
     screen_w, screen_h = screen.get_size()
-
-    # Font
     title_font = pygame.font.Font(font_path, 48)
     info_font = pygame.font.SysFont("segoeui", 22)
-
-    # Load ảnh nền & scale theo chiều cao màn hình
     bg_img = pygame.image.load(asset_path("background.png")).convert()
     bg_width, bg_height = bg_img.get_size()
     scale_factor = screen_h / bg_height
     bg_width_scaled = int(bg_width * scale_factor)
     bg_img = pygame.transform.scale(bg_img, (bg_width_scaled, screen_h))
-
-    scroll_x = 0
-    speed = 0.6
-
-    # Panel settings
+    scroll_x, speed, alpha = 0, 0.6, 0
     panel_w, panel_h = 400, 200
-    panel_x = (screen_w - panel_w) // 2
-    panel_y = (screen_h - panel_h) // 2
-
-    # Fade-in alpha
-    alpha = 0
+    panel_x, panel_y = (screen_w - panel_w) // 2, (screen_h - panel_h) // 2
     waiting = True
     while waiting:
-        # Cuộn background
         scroll_x -= speed
         if scroll_x <= -bg_width_scaled:
             scroll_x = 0
         screen.blit(bg_img, (scroll_x, 0))
         screen.blit(bg_img, (scroll_x + bg_width_scaled, 0))
-
-        # Overlay tối
         overlay = pygame.Surface((screen_w, screen_h))
         overlay.set_alpha(100)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
-
-        # ----- Panel -----
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(panel, (30, 30, 40, alpha), panel.get_rect(), border_radius=15)   # nền mờ
-        pygame.draw.rect(panel, (200, 200, 200, alpha), panel.get_rect(), 3, border_radius=15) # viền
+        pygame.draw.rect(panel, (30, 30, 40, alpha), panel.get_rect(), border_radius=15)
+        pygame.draw.rect(panel, (200, 200, 200, alpha), panel.get_rect(), 3, border_radius=15)
         screen.blit(panel, (panel_x, panel_y))
-
-        # ----- Text trong panel -----
-        if alpha > 150:  # hiện chữ khi panel đã đủ rõ
+        if alpha > 150:
             label = title_font.render(text, True, color)
             label_rect = label.get_rect(center=(screen_w // 2, panel_y + 70))
             screen.blit(label, label_rect)
-
             info = info_font.render("Nhấn SPACE để tiếp tục...", True, (220,220,220))
             info_rect = info.get_rect(center=(screen_w // 2, panel_y + panel_h - 40))
             screen.blit(info, info_rect)
-
-        # Cập nhật
         pygame.display.flip()
-
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return "exit"
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and alpha >= 180:
-                waiting = False
-
-        # Tăng alpha cho hiệu ứng fade-in
-        if alpha < 220:
-            alpha += 5
-
+            if event.type == pygame.QUIT: return "exit"
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and alpha >= 180: waiting = False
+        if alpha < 220: alpha += 5
         clock.tick(60)
-
     return "next"
 
 def blur_surface(surface, radius=5):
     arr = pygame.surfarray.array3d(surface)
-    img = Image.fromarray(np.transpose(arr, (1, 0, 2)))  # đổi trục (x,y)
-    img = img.filter(ImageFilter.GaussianBlur(radius=radius))  # làm mờ
-    arr = np.transpose(np.array(img), (1, 0, 2))  # đổi lại
+    img = Image.fromarray(np.transpose(arr, (1, 0, 2)))
+    img = img.filter(ImageFilter.GaussianBlur(radius=radius))
+    arr = np.transpose(np.array(img), (1, 0, 2))
     return pygame.surfarray.make_surface(arr)
 
 def end_screen(result):
     global screen, clock, big_font
-
     screen_w, screen_h = screen.get_size()
-
     snapshot = screen.copy()
     blurred = blur_surface(snapshot, radius=8)
     screen.blit(blurred, (0, 0))
-
-    # ----- Label -----
     text = "GAME OVER" if result == "lose" else "Bạn đã thắng!"
-
-    color = (255, 215, 0) if result == "lose" else (180, 0, 0)
+    color = (255, 80, 80) if result == "lose" else (255, 215, 0)
     label = menu_font.render(text, True, color)
     label_rect = label.get_rect(center=(screen_w // 2, screen_h // 2 - 60))
     screen.blit(label, label_rect)
-
-    # ----- Buttons -----
-    button_width, button_height = 120, 50
-    spacing = 20
+    button_width, button_height, spacing = 120, 50, 20
     total_width = button_width * 2 + spacing
-    start_x = (screen_w - total_width) // 2
-    y = screen_h // 2 + 20
-
+    start_x, y = (screen_w - total_width) // 2, screen_h // 2 + 20
     retry_btn = pygame.Rect(start_x, y, button_width, button_height)
     exit_btn = pygame.Rect(start_x + button_width + spacing, y, button_width, button_height)
-
     draw_button(retry_btn, "Retry", (50, 150, 200))
     draw_button(exit_btn, "Exit", (200, 50, 50))
-
     pygame.display.flip()
-
-    # ----- Vòng lặp sự kiện -----
     while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.mixer.music.stop()
-                return "exit"
+            if event.type == pygame.QUIT: return "exit"
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if retry_btn.collidepoint(event.pos):
-                    pygame.mixer.music.stop()
-                    pygame.mixer.stop()
-                    return "retry"
-                elif exit_btn.collidepoint(event.pos):
-                    pygame.mixer.music.stop()
-                    pygame.mixer.stop()
-                    return "exit"
+                if retry_btn.collidepoint(event.pos): return "retry"
+                elif exit_btn.collidepoint(event.pos): return "exit"
         clock.tick(30)
-
   
 def draw_minimap(maze, player_pos, hunter_pos, goal, panel_rect, offset_x, offset_y, map_w_pix, map_h_pix):
     MINI_W, MINI_H = 120, 120
     mini_x = panel_rect.x + (panel_rect.width - MINI_W) // 2
     mini_y = 10
     rows, cols = len(maze), len(maze[0])
-    sx = MINI_W / map_w_pix
-    sy = MINI_H / map_h_pix
-
+    sx, sy = MINI_W / map_w_pix, MINI_H / map_h_pix
     pygame.draw.rect(screen, (20,20,20), (mini_x-2, mini_y-2, MINI_W+4, MINI_H+4))
     pygame.draw.rect(screen, (120,120,120), (mini_x-2, mini_y-2, MINI_W+4, MINI_H+4), 2)
-
-    cell_w = CELL_SIZE * sx
-    cell_h = CELL_SIZE * sy
+    cell_w, cell_h = CELL_SIZE * sx, CELL_SIZE * sy
     for r in range(rows):
         for c in range(cols):
             color = (50,50,50) if maze[r][c] == 1 else (220,220,220)
-            rx = mini_x + c * cell_w
-            ry = mini_y + r * cell_h
-            if rx > mini_x + MINI_W or ry > mini_y + MINI_H:
-                continue
+            rx, ry = mini_x + c * cell_w, mini_y + r * cell_h
+            if rx > mini_x + MINI_W or ry > mini_y + MINI_H: continue
             pygame.draw.rect(screen, color, (rx, ry, cell_w+1, cell_h+1))
-
     pulse = (math.sin(pygame.time.get_ticks() * 0.005) + 1) * 0.5
     bright = int(200 + 55 * pulse)
-
-    tx = mini_x + goal[1] * CELL_SIZE * sx
-    ty = mini_y + goal[0] * CELL_SIZE * sy
-    tre_w = max(6, cell_w)
-    tre_h = max(6, cell_h)
+    tx, ty = mini_x + goal[1] * CELL_SIZE * sx, mini_y + goal[0] * CELL_SIZE * sy
+    tre_w, tre_h = max(6, cell_w), max(6, cell_h)
     pygame.draw.rect(screen, (255, 0, 0), (tx-2, ty-2, tre_w+4, tre_h+4))
     pygame.draw.rect(screen, (bright, bright, 0), (tx, ty, tre_w, tre_h))
-
-    px = mini_x + player_pos[1] * CELL_SIZE * sx
-    py = mini_y + player_pos[0] * CELL_SIZE * sy
+    px, py = mini_x + player_pos[1] * CELL_SIZE * sx, mini_y + player_pos[0] * CELL_SIZE * sy
     pygame.draw.rect(screen, (50,150,255), (px, py, max(3, cell_w), max(3, cell_h)))
-
-    hx = mini_x + hunter_pos[1] * CELL_SIZE * sx
-    hy = mini_y + hunter_pos[0] * CELL_SIZE * sy
+    hx, hy = mini_x + hunter_pos[1] * CELL_SIZE * sx, mini_y + hunter_pos[0] * CELL_SIZE * sy
     pygame.draw.rect(screen, (200,50,50), (hx, hy, max(3, cell_w), max(3, cell_h)))
-
-    view_rx = mini_x + (offset_x) * sx
-    view_ry = mini_y + (offset_y) * sy
-    view_rw = VIEWPORT_W * sx
-    view_rh = VIEWPORT_H * sy
+    view_rx, view_ry = mini_x + offset_x * sx, mini_y + offset_y * sy
+    view_rw, view_rh = VIEWPORT_W * sx, VIEWPORT_H * sy
     pygame.draw.rect(screen, (0,200,0), (view_rx, view_ry, view_rw, view_rh), 2)
 
 def can_unlock_level(keys, required_keys=3):
-    """
-    Kiểm tra người chơi có đủ key để mở cửa qua màn.
-
-    Args:
-        keys (int): số lượng key hiện tại của người chơi.
-        required_keys (int): số lượng key cần thiết để qua màn. Mặc định là 3.
-
-    Returns:
-        bool: True nếu đủ key, False nếu chưa đủ.
-    """
     return keys >= required_keys
