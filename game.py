@@ -58,6 +58,9 @@ def stop_all_sfx():
         pygame.mixer.music.stop() 
     except Exception: pass
 
+# ===== CONFIG =====
+REQUIRED_KEYS_TO_UNLOCK = 3  # sửa nếu muốn số chìa khác
+
 # ------------------ Game loop ------------------
 def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
     mode_titles = {
@@ -129,6 +132,17 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
 
     last_foot_play, foot_cooldown_ms = 0, 120
 
+    # ---------------- Popup variables (non-blocking, fade-in + shake) ----------------
+    show_key_popup = False
+    missing_keys = 0
+    popup_alpha = 0
+    popup_fade_in = False
+    popup_shake_timer = 0
+    POPUP_SHAKE_DURATION = 200  # ms
+    popup_shake_magnitude = 10   # pixels max shake
+    popup_font_big = pygame.font.SysFont("Segoe UI", 28, bold=True)
+    popup_font_small = pygame.font.SysFont("Segoe UI", 22)
+
     while running:
         buttons = utils.get_control_buttons(paused)
         mouse_pos = pygame.mouse.get_pos()
@@ -138,6 +152,19 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 stop_all_sfx(); running = False
+
+            # If popup is shown, only accept SPACE (and QUIT) here (consume other events)
+            if show_key_popup:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    # close popup
+                    show_key_popup = False
+                    popup_alpha = 0
+                    popup_fade_in = False
+                    popup_shake_timer = 0
+                    paused = False
+                # ignore other inputs while popup is active (but still allow quit)
+                continue
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if buttons.get("reset") and buttons["reset"].collidepoint(event.pos): stop_all_sfx(); return "reset", coins, keys
                 if buttons.get("pause") and buttons["pause"].collidepoint(event.pos): paused = True
@@ -168,9 +195,12 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                     target_off_x = utils.clamp(map_x - VIEWPORT_W//2, 0, max(0, MAP_W_PIX - VIEWPORT_W))
                     target_off_y = utils.clamp(map_y - VIEWPORT_H//2, 0, max(0, MAP_H_PIX - VIEWPORT_H))
                     offset_x, offset_y = target_off_x, target_off_y
+
+            # Pass events to player when not paused and no popup
             if not paused:
                 player.handle_input_event(event)
 
+        # --- Update ---
         utils.screen.fill((10,0,0), rect=pygame.Rect(0,0,VIEWPORT_W, VIEWPORT_H))
 
         if not paused:
@@ -263,9 +293,65 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
         utils.draw_control_panel(VIEWPORT_W, VIEWPORT_H, paused, mode, coins=coins, keys=keys, lives=player.lives)
         utils.draw_minimap(maze, player.pos, hunter.pos, goal, panel_rect, offset_x, offset_y, MAP_W_PIX, MAP_H_PIX)
 
+        # ---------------------- render popup (fade-in + shake) ----------------------
+        if show_key_popup:
+            now = pygame.time.get_ticks()
+            # fade-in alpha
+            if popup_fade_in:
+                # increase alpha smoothly (adjust step for speed)
+                popup_alpha = min(255, popup_alpha + 20)
+                if popup_alpha >= 255:
+                    popup_fade_in = False
+                    popup_alpha = 255
+                # start shake timer at beginning of fade
+                popup_shake_timer = now + POPUP_SHAKE_DURATION
+
+            # compute shake offset if within shake duration
+            shake_dx = 0
+            shake_dy = 0
+            if now < popup_shake_timer:
+                # fraction remaining (1 -> 0)
+                frac = (popup_shake_timer - now) / POPUP_SHAKE_DURATION
+                mag = popup_shake_magnitude * frac
+                shake_dx = random.uniform(-mag, mag)
+                shake_dy = random.uniform(-mag, mag)
+
+            popup_w, popup_h = 460, 180
+            popup_x = VIEWPORT_W//2 - popup_w//2 + int(shake_dx)
+            popup_y = VIEWPORT_H//2 - popup_h//2 + int(shake_dy)
+            popup_rect = pygame.Rect(popup_x, popup_y, popup_w, popup_h)
+
+            # background surface with alpha
+            s = pygame.Surface((popup_w, popup_h), pygame.SRCALPHA)
+            # background fill respects alpha but multiply so it's visible earlier
+            bg_alpha = int(popup_alpha * 0.9)
+            s.fill((20, 20, 30, bg_alpha))
+            utils.screen.blit(s, (popup_x, popup_y))
+
+            # border (draw on an RGBA surface)
+            border_surface = pygame.Surface((popup_w, popup_h), pygame.SRCALPHA)
+            pygame.draw.rect(border_surface, (200, 50, 50, popup_alpha), border_surface.get_rect(), 3, border_radius=12)
+            utils.screen.blit(border_surface, (popup_x, popup_y))
+
+            # render text with alpha applied via set_alpha on surfaces
+            text1_surf = popup_font_big.render(f"🔒 Cần {missing_keys} chìa khóa để qua màn!", True, (255,255,255))
+            text2_surf = popup_font_small.render("Nhấn SPACE để tiếp tục", True, (220,220,220))
+            # apply alpha by blitting onto temporary surface
+            tmp1 = pygame.Surface(text1_surf.get_size(), pygame.SRCALPHA)
+            tmp1.blit(text1_surf, (0,0))
+            tmp1.set_alpha(popup_alpha)
+            utils.screen.blit(tmp1, (popup_x + popup_w//2 - text1_surf.get_width()//2, popup_y + 40))
+
+            tmp2 = pygame.Surface(text2_surf.get_size(), pygame.SRCALPHA)
+            tmp2.blit(text2_surf, (0,0))
+            tmp2.set_alpha(popup_alpha)
+            utils.screen.blit(tmp2, (popup_x + popup_w//2 - text2_surf.get_width()//2, popup_y + 100))
+        # ---------------------------------------------------------------------------
+
         pygame.display.flip()
         utils.clock.tick(30)
 
+        # --- Game logic after rendering ---
         if not paused:
             if tuple(player.pos) == tuple(hunter.pos):
                 remaining_lives = player.lose_life()
@@ -298,19 +384,30 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
             if pygame.time.get_ticks() >= hunter_stun_timer:
                 hunter.update(player.pos, maze, mode, theme) 
 
+            # ==== GOAL / CHEST CHECK ====
             if tuple(player.pos) == goal:
-                if utils.can_unlock_level(keys):
+                if utils.can_unlock_level(keys, required_keys=REQUIRED_KEYS_TO_UNLOCK):
                     if win_sound: 
                         try: win_sound.play() 
                         except Exception: pass
                     stop_all_sfx(); return "win", coins, keys
                 else:
-                    font = pygame.font.SysFont("Segoe UI", 24, bold=True)
-                    msg = f"Cần {3 - keys} key nữa để qua màn!"
-                    label = font.render(msg, True, (255, 50, 50))
-                    utils.screen.blit(label, (VIEWPORT_W//2 - label.get_width()//2, VIEWPORT_H//2 - 20))
-                    pygame.display.flip()
-                    pygame.time.delay(1000)
+                    # show non-blocking popup and pause game until SPACE
+                    missing_keys = max(0, REQUIRED_KEYS_TO_UNLOCK - keys)
+                    show_key_popup = True
+                    popup_alpha = 0
+                    popup_fade_in = True
+                    # start shake by setting popup_shake_timer in render phase
+                    paused = True
+                    # optional: play shout/error sound once when popup appears
+                    try:
+                        if shout_sound:
+                            if lose_channel:
+                                lose_channel.play(shout_sound)
+                            else:
+                                shout_sound.play()
+                    except Exception:
+                        pass
 
     stop_all_sfx()
     return "exit", coins, keys
