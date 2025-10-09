@@ -55,7 +55,7 @@ def stop_all_sfx():
         if lose_channel: lose_channel.stop()
         if foot_channel: foot_channel.stop()
         pygame.mixer.stop()
-        pygame.mixer.music.stop() 
+        pygame.mixer.music.stop()
     except Exception: pass
 
 # ===== CONFIG =====
@@ -143,6 +143,9 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
     popup_font_big = pygame.font.SysFont("Segoe UI", 28, bold=True)
     popup_font_small = pygame.font.SysFont("Segoe UI", 22)
 
+    # Ensure prev_pos exists even if player hasn't moved yet (fix UnboundLocalError)
+    prev_pos = tuple(player.pos)
+
     while running:
         buttons = utils.get_control_buttons(paused)
         mouse_pos = pygame.mouse.get_pos()
@@ -156,7 +159,7 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
             # If popup is shown, only accept SPACE (and QUIT) here (consume other events)
             if show_key_popup:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                    # close popup
+                    # close popup and unpause
                     show_key_popup = False
                     popup_alpha = 0
                     popup_fade_in = False
@@ -166,10 +169,14 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                 continue
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if buttons.get("reset") and buttons["reset"].collidepoint(event.pos): stop_all_sfx(); return "reset", coins, keys
-                if buttons.get("pause") and buttons["pause"].collidepoint(event.pos): paused = True
-                if buttons.get("continue") and buttons["continue"].collidepoint(event.pos): paused = False
-                if buttons.get("surrender") and buttons["surrender"].collidepoint(event.pos): stop_all_sfx(); return "exit", coins, keys
+                if buttons.get("reset") and buttons["reset"].collidepoint(event.pos):
+                    stop_all_sfx(); pygame.mixer.music.stop(); return "reset", coins, keys
+                if buttons.get("pause") and buttons["pause"].collidepoint(event.pos):
+                    paused = True
+                if buttons.get("continue") and buttons["continue"].collidepoint(event.pos):
+                    paused = False
+                if buttons.get("surrender") and buttons["surrender"].collidepoint(event.pos):
+                    stop_all_sfx(); pygame.mixer.music.stop(); return "exit", coins, keys
                 if event.button == 1 and event.pos[0] < VIEWPORT_W and event.pos[1] < VIEWPORT_H:
                     dragging, last_mouse_pos = True, event.pos
                 elif event.button == 1 and panel_rect.collidepoint(event.pos):
@@ -198,12 +205,18 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
 
             # Pass events to player when not paused and no popup
             if not paused:
-                player.handle_input_event(event)
+                # Ignore SPACE acting as movement: consume SPACE here so it won't call player.handle_input_event
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    # do nothing (SPACE is reserved for popups)
+                    pass
+                else:
+                    player.handle_input_event(event)
 
         # --- Update ---
         utils.screen.fill((10,0,0), rect=pygame.Rect(0,0,VIEWPORT_W, VIEWPORT_H))
 
         if not paused:
+            # update prev_pos BEFORE player.update so we can restore here if needed
             prev_pos = tuple(player.pos)
             player.update(maze)
             hunter.update(player.pos, maze, mode, theme)
@@ -368,6 +381,7 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                 
                 if remaining_lives <= 0:
                     stop_all_sfx()
+                    pygame.mixer.music.stop()  # 🔇 đảm bảo dừng nhạc nền hẳn
 
                     if lose_sound:
                         try:
@@ -387,19 +401,32 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
             # ==== GOAL / CHEST CHECK ====
             if tuple(player.pos) == goal:
                 if utils.can_unlock_level(keys, required_keys=REQUIRED_KEYS_TO_UNLOCK):
-                    if win_sound: 
-                        try: win_sound.play() 
+                    if win_sound:
+                        try: win_sound.play()
                         except Exception: pass
-                    stop_all_sfx(); return "win", coins, keys
+                    stop_all_sfx()
+                    pygame.mixer.music.stop()  # 🔇 dừng nhạc nền khi thắng
+                    return "win", coins, keys
                 else:
-                    # show non-blocking popup and pause game until SPACE
+                    # Quay lại vị trí cũ để tránh đứng trong goal
+                    try:
+                        player.grid_pos = list(prev_pos)
+                        player.pixel_pos = [player.grid_pos[1]*CELL_SIZE, player.grid_pos[0]*CELL_SIZE]
+                        player.is_moving = False
+                    except Exception:
+                        # fallback an toàn (nếu prev_pos lạ) đưa về start
+                        player.grid_pos = list(start)
+                        player.pixel_pos = [player.grid_pos[1]*CELL_SIZE, player.grid_pos[0]*CELL_SIZE]
+                        player.is_moving = False
+
+                    # Hiện popup thông báo
                     missing_keys = max(0, REQUIRED_KEYS_TO_UNLOCK - keys)
                     show_key_popup = True
                     popup_alpha = 0
                     popup_fade_in = True
-                    # start shake by setting popup_shake_timer in render phase
                     paused = True
-                    # optional: play shout/error sound once when popup appears
+
+                    # Âm thanh cảnh báo
                     try:
                         if shout_sound:
                             if lose_channel:

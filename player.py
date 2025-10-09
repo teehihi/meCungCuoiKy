@@ -92,8 +92,21 @@ class Player:
     def pos(self):
         return self.grid_pos
 
+    @pos.setter
+    def pos(self, value):
+        self.grid_pos = list(value)
+        # Cập nhật lại pixel position để vẽ đúng vị trí
+        self.pixel_pos = [
+            self.grid_pos[1] * CELL_SIZE,
+            self.grid_pos[0] * CELL_SIZE
+        ]
+
     def handle_input_event(self, event):
         if event.type == pygame.KEYDOWN:
+            # Bỏ qua SPACE (không cho di chuyển bằng Space)
+            if event.key == pygame.K_SPACE:
+                return
+
             self.is_moving = True
             if event.key == pygame.K_UP:
                 self.direction = "up"
@@ -105,6 +118,8 @@ class Player:
                 self.direction = "right"
 
         elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_SPACE:
+                return
             self.is_moving = False
 
     def update(self, maze):
