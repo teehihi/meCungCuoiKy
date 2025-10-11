@@ -80,6 +80,20 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
     utils.load_coin_sprites(theme)
     utils.load_key_sprites(theme)
 
+    listConanS = ["conan1", "conan2"]
+    conanBG = random.choice(listConanS)
+    # ==== NHẠC NỀN THEO CHỦ ĐỀ ====
+    try:
+        pygame.mixer.music.stop()  # dừng nhạc cũ
+        if theme.lower() == "conan":
+            pygame.mixer.music.load(asset_path(f"sounds/bg_{conanBG}.mp3"))
+        else:
+            pygame.mixer.music.load(asset_path("sounds/bg_music.mp3"))
+        pygame.mixer.music.set_volume(0.5)
+        pygame.mixer.music.play(-1)
+    except Exception as e:
+        print("Không thể load nhạc nền cho theme:", theme, "-", e)
+
     ruin_images, bg_ruin_img, floor_img = utils.load_theme(theme)
 
     maze = utils.generate_maze(MAP_COLS, MAP_ROWS)
@@ -232,9 +246,19 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                         try: coin_collect.play() 
                         except Exception: pass
                 elif picked["type"] == "quiz":
+
+                    
                     try:
                         pygame.mixer.music.pause()
-                        if quiz_sound: quiz_sound.play()
+
+                        # === PHÁT NHẠC CÂU HỎI RIÊNG CHO TỪNG THEME ===
+                        if theme.lower() == "conan":
+                            quiz_sound_path = asset_path("sounds/quizzSound_conan.mp3")
+                            quiz_theme_sound = pygame.mixer.Sound(quiz_sound_path)
+                            quiz_theme_sound.play()
+                        else:
+                            if quiz_sound:
+                                quiz_sound.play()
                     except Exception: pass
                     utils.draw_maze(maze, goal, offset_x, offset_y, wall_mapping, ruin_images, bg_ruin_img, floor_img)
                     player.draw(utils.screen, offset_x, offset_y)
@@ -243,7 +267,10 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                     SKIP_COST = 10
                     res = show_question_popup(coins, skip_cost=SKIP_COST, background_snapshot=background_snapshot)
                     try:
-                        if quiz_sound: quiz_sound.stop()
+                        if theme.lower() == "conan":
+                            quiz_theme_sound.stop()
+                        elif quiz_sound:
+                            quiz_sound.stop()
                         pygame.mixer.music.unpause()
                     except Exception: pass
                     if res == "correct": keys += 1
@@ -368,13 +395,23 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
         if not paused:
             if tuple(player.pos) == tuple(hunter.pos):
                 remaining_lives = player.lose_life()
-                sound_to_play = shout_sound if remaining_lives > 0 else lose_sound
-                if sound_to_play:
-                    try:
-                        if lose_channel: lose_channel.play(sound_to_play)
-                        else: sound_to_play.play()
-                    except Exception: pass
-                
+                try:
+                    if remaining_lives > 0:
+                        # Bị đụng quái nhưng chưa thua
+                        if theme.lower() == "conan":
+                            custom_shout = pygame.mixer.Sound(asset_path("sounds/shout_conan.mp3"))
+                            custom_shout.play()
+                        else:
+                            if lose_channel: lose_channel.play(shout_sound)
+                            else: shout_sound.play()
+                    else:
+                        # Thua hẳn (mất hết mạng)
+                        if lose_channel: lose_channel.play(lose_sound)
+                        else: lose_sound.play()
+                except Exception as e:
+                    print("Không thể phát âm thanh theo theme:", e)
+                # ================================================================
+
                 hunter_stun_timer = pygame.time.get_ticks() + STUN_DURATION
                 hunter.pos = hunter.respawn_safely(maze, player.pos, RESPAWN_DISTANCE)
                 hunter.path = None 
@@ -401,12 +438,21 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
             # ==== GOAL / CHEST CHECK ====
             if tuple(player.pos) == goal:
                 if utils.can_unlock_level(keys, required_keys=REQUIRED_KEYS_TO_UNLOCK):
-                    if win_sound:
-                        try: win_sound.play()
-                        except Exception: pass
-                    stop_all_sfx()
-                    pygame.mixer.music.stop()  # 🔇 dừng nhạc nền khi thắng
+                    # --- PHÁT NHẠC THẮNG ---
+                    try:
+                        pygame.mixer.music.stop()   # dừng nhạc nền trước
+                        stop_all_sfx()              # dừng SFX khác
+                        win_sound = pygame.mixer.Sound(asset_path("sounds/win.mp3"))
+                        win_sound.set_volume(0.8)
+                        win_channel = pygame.mixer.find_channel(True)
+                        win_channel.play(win_sound)
+                        pygame.time.delay(500)  # cho nhạc vang lên một chút
+                    except Exception as e:
+                        print("Lỗi phát nhạc win:", e)
+                    # ------------------------
+
                     return "win", coins, keys
+
                 else:
                     # Quay lại vị trí cũ để tránh đứng trong goal
                     try:
