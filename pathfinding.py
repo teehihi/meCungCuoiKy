@@ -522,281 +522,30 @@ def online_dfs(start, goal, maze, visualize=False, delay=0.05):
                 stack.append((nr,nc))
                 path.append((nr,nc))
     return path
-# # ================= Minimax-Limited =================
-# def minimax_limited(start, goal, maze, max_depth=4, visualize=False, delay=0.05):
-#     ROWS, COLS = len(maze), len(maze[0])
-#     directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-
-#     def heuristic(pos):
-#         return -hx(pos, goal)
-
-#     def dfs_limited(node, depth, visited):
-#         if depth == 0 or node == goal:
-#             return heuristic(node), [node]
-#         visited.add(node)
-#         if visualize:
-#             print_maze_step(maze, [node], current=node, start=start, goal=goal)
-#             time.sleep(delay)
-#         best_val, best_path = -math.inf, [node]
-#         for dr, dc in directions:
-#             nr, nc = node[0]+dr, node[1]+dc
-#             nxt = (nr, nc)
-#             if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
-#                 val, p = dfs_limited(nxt, depth-1, visited.copy())
-#                 if val > best_val:
-#                     best_val, best_path = val, [node] + p
-#         return best_val, best_path
-
-#     _, path = dfs_limited(start, max_depth, set())
-#     return path if path else [start]
-# # ================= Minimax/Alpha-Beta =================
-# # ================= Minimax (Maze Version) =================
-# directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-
-# def hx(pos, goal):
-#     # Heuristic: Manhattan distance
-#     return abs(pos[0] - goal[0]) + abs(pos[1] - goal[1])
-
-# def print_maze_step(maze, path=None, current=None, start=None, goal=None):
-#     if path is None:
-#         path = []
-#     display = ""
-#     for r in range(len(maze)):
-#         for c in range(len(maze[0])):
-#             if (r, c) == start:
-#                 display += "S"
-#             elif (r, c) == goal:
-#                 display += "G"
-#             elif (r, c) == current:
-#                 display += "*"
-#             elif (r, c) in path:
-#                 display += "o"
-#             elif maze[r][c] == 1:
-#                 display += "#"
-#             else:
-#                 display += "."
-#         display += "\n"
-#     print(display)
-
-# def minimax(node, goal, maze, depth, maximizing=True, visited=None, visualize=False, delay=0.05):
-#     ROWS, COLS = len(maze), len(maze[0])
-#     if visited is None:
-#         visited = set()
-
-#     def heuristic(pos):
-#         return -hx(pos, goal)
-
-#     if depth == 0 or node == goal:
-#         return heuristic(node), [node]
-
-#     visited.add(node)
-#     if visualize:
-#         print_maze_step(maze, [node], current=node, start=None, goal=goal)
-#         time.sleep(delay)
-
-#     best_path = [node]
-
-#     if maximizing:
-#         best_val = -math.inf
-#         for dr, dc in directions:
-#             nr, nc = node[0]+dr, node[1]+dc
-#             nxt = (nr, nc)
-#             if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
-#                 val, p = minimax(nxt, goal, maze, depth-1, False, visited.copy(), visualize, delay)
-#                 if val > best_val:
-#                     best_val, best_path = val, [node] + p
-#     else:
-#         best_val = math.inf
-#         for dr, dc in directions:
-#             nr, nc = node[0]+dr, node[1]+dc
-#             nxt = (nr, nc)
-#             if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
-#                 val, p = minimax(nxt, goal, maze, depth-1, True, visited.copy(), visualize, delay)
-#                 if val < best_val:
-#                     best_val, best_path = val, [node] + p
-#     return best_val, best_path
-
-# def minimax_maze(start, goal, maze, max_depth=5, visualize=False, delay=0.05):
-#     _, path = minimax(start, goal, maze, max_depth, True, set(), visualize, delay)
-#     return path if path else [start]
-
-
-# def alpha_beta(start, goal, maze, visualize=False, delay=0.05, max_depth=500):
-#     """
-#     Tìm đường đi trong mê cung sử dụng Alpha-Beta Pruning.
-#     Đây là phiên bản đã được viết lại hoàn toàn để tương thích với game.
-#     """
-    
-#     # Hàm đệ quy để thực hiện tìm kiếm alpha-beta
-#     def _alpha_beta_recursive(node, depth, alpha, beta, maximizing_player, visited):
-        
-#         # Hàm heuristic để đánh giá điểm của một ô: càng gần đích, điểm càng cao.
-#         def heuristic(pos):
-#             return -hx(pos, goal) # Dùng số âm vì hx nhỏ (tốt) -> điểm số lớn (tốt)
-
-#         # Điều kiện dừng: hết độ sâu tìm kiếm hoặc đã đến đích
-#         if depth == 0 or node == goal:
-#             return heuristic(node), [node]
-
-#         # Đánh dấu đã ghé thăm để tránh lặp
-#         visited.add(node)
-
-#         # Gửi thông tin cho visualizer
-#         if visualize:
-#             print_maze_step(maze, [node], current=node, start=start, goal=goal)
-#             time.sleep(delay)
-
-#         # Lấy các bước đi hợp lệ (lên, xuống, trái, phải)
-#         ROWS, COLS = len(maze), len(maze[0])
-#         moves = []
-#         for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-#             nr, nc = node[0] + dr, node[1] + dc
-#             if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr, nc) not in visited:
-#                 moves.append((nr, nc))
-        
-#         # Nếu là lượt của MAX (người chơi chính)
-#         if maximizing_player:
-#             best_val = -math.inf
-#             best_path = [node]
-#             for move in moves:
-#                 val, path = _alpha_beta_recursive(move, depth - 1, alpha, beta, False, visited.copy())
-#                 if val > best_val:
-#                     best_val = val
-#                     best_path = [node] + path
-#                 alpha = max(alpha, best_val)
-#                 if beta <= alpha:
-#                     break # Cắt tỉa Beta
-#             return best_val, best_path
-        
-#         # Nếu là lượt của MIN (đối thủ giả định)
-#         else:
-#             best_val = math.inf
-#             best_path = [node]
-#             for move in moves:
-#                 val, path = _alpha_beta_recursive(move, depth - 1, alpha, beta, True, visited.copy())
-#                 if val < best_val:
-#                     best_val = val
-#                     best_path = [node] + path
-#                 beta = min(beta, best_val)
-#                 if beta <= alpha:
-#                     break # Cắt tỉa Alpha
-#             return best_val, best_path
-
-#     # Khởi tạo và bắt đầu quá trình tìm kiếm
-#     _, path = _alpha_beta_recursive(start, max_depth, -math.inf, math.inf, True, set())
-#     return path if path else [start]
-# BIẾN DÙNG CHUNG
-DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1)] # Xuống, Lên, Phải, Trái
-
-# HÀM ĐÁNH GIÁ HEURISTIC
-def _heuristic(pos, goal):
-    # Càng gần đích, điểm càng cao
-    return -hx(pos, goal)
-
-# ================= HÀM ĐỆ QUY MINIMAX DÙNG CHUNG =================
-def _minimax_recursive(node, start, goal, maze, depth, maximizing_player, visited, visualize, delay):
-    """Hàm đệ quy cốt lõi cho Minimax."""
-    if depth == 0 or node == goal:
-        return _heuristic(node, goal), [node]
-
-    visited.add(node)
-    
-    # Lấy các nước đi hợp lệ
+# ================= Minimax-Limited =================
+def minimax_limited(start, goal, maze, max_depth=4, visualize=False, delay=0.05):
     ROWS, COLS = len(maze), len(maze[0])
-    moves = []
-    for dr, dc in DIRECTIONS:
-        nr, nc = node[0] + dr, node[1] + dc
-        if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr, nc) not in visited:
-            moves.append((nr, nc))
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
-    # Cải thiện Visualize: hiển thị cả đường đi dẫn đến node hiện tại
-    # (Hàm record_print trong visualizer sẽ tự động lấy path này)
-    if visualize:
-        # Để visualize đúng, chúng ta cần truyền path hiện tại,
-        # nhưng vì cấu trúc đệ quy này không truyền path,
-        # chúng ta chỉ visualize node đang xét.
-        print_maze_step(maze, [node], current=node, start=start, goal=goal)
-        time.sleep(delay)
+    def heuristic(pos):
+        return -hx(pos, goal)
 
-    if maximizing_player:
-        best_val = -math.inf
-        best_path = [node]
-        for move in moves:
-            val, path = _minimax_recursive(move, start, goal, maze, depth - 1, False, visited.copy(), visualize, delay)
-            if val > best_val:
-                best_val = val
-                best_path = [node] + path
-        return best_val, best_path
-    else: # Minimizing player
-        best_val = math.inf
-        best_path = [node]
-        for move in moves:
-            val, path = _minimax_recursive(move, start, goal, maze, depth - 1, True, visited.copy(), visualize, delay)
-            if val < best_val:
-                best_val = val
-                best_path = [node] + path
+    def dfs_limited(node, depth, visited):
+        if depth == 0 or node == goal:
+            return heuristic(node), [node]
+        visited.add(node)
+        if visualize:
+            print_maze_step(maze, [node], current=node, start=start, goal=goal)
+            time.sleep(delay)
+        best_val, best_path = -math.inf, [node]
+        for dr, dc in directions:
+            nr, nc = node[0]+dr, node[1]+dc
+            nxt = (nr, nc)
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
+                val, p = dfs_limited(nxt, depth-1, visited.copy())
+                if val > best_val:
+                    best_val, best_path = val, [node] + p
         return best_val, best_path
 
-# ================= HÀM ĐỆ QUY ALPHA-BETA DÙNG CHUNG =================
-def _alphabeta_recursive(node, start, goal, maze, depth, alpha, beta, maximizing_player, visited, visualize, delay):
-    """Hàm đệ quy cốt lõi cho Alpha-Beta."""
-    if depth == 0 or node == goal:
-        return _heuristic(node, goal), [node]
-
-    visited.add(node)
-    
-    ROWS, COLS = len(maze), len(maze[0])
-    moves = []
-    for dr, dc in DIRECTIONS:
-        nr, nc = node[0] + dr, node[1] + dc
-        if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr, nc) not in visited:
-            moves.append((nr, nc))
-
-    if visualize:
-        print_maze_step(maze, [node], current=node, start=start, goal=goal)
-        time.sleep(delay)
-
-    if maximizing_player:
-        best_val = -math.inf
-        best_path = [node]
-        for move in moves:
-            val, path = _alphabeta_recursive(move, start, goal, maze, depth - 1, alpha, beta, False, visited.copy(), visualize, delay)
-            if val > best_val:
-                best_val = val
-                best_path = [node] + path
-            alpha = max(alpha, best_val)
-            if beta <= alpha:
-                break # Cắt tỉa Beta
-        return best_val, best_path
-    else: # Minimizing player
-        best_val = math.inf
-        best_path = [node]
-        for move in moves:
-            val, path = _alphabeta_recursive(move, start, goal, maze, depth - 1, alpha, beta, True, visited.copy(), visualize, delay)
-            if val < best_val:
-                best_val = val
-                best_path = [node] + path
-            beta = min(beta, best_val)
-            if beta <= alpha:
-                break # Cắt tỉa Alpha
-        return best_val, best_path
-
-# ================= CÁC HÀM CHÍNH GỌI TỪ VISUALIZER =================
-
-def minimax_maze(start, goal, maze, visualize=False, delay=0.05, max_depth=5):
-    """Hàm Minimax chính."""
-    # Xóa hàm minimax() cũ đi, vì đã có _minimax_recursive()
-    _, path = _minimax_recursive(start, start, goal, maze, max_depth, True, set(), visualize, delay)
+    _, path = dfs_limited(start, max_depth, set())
     return path if path else [start]
-
-def alpha_beta(start, goal, maze, visualize=False, delay=0.05, max_depth=7):
-    """Hàm Alpha-Beta chính."""
-    _, path = _alphabeta_recursive(start, start, goal, maze, max_depth, -math.inf, math.inf, True, set(), visualize, delay)
-    return path if path else [start]
-
-def minimax_limited(start, goal, maze, visualize=False, delay=0.05, max_depth=4):
-    """
-    Hàm này về bản chất là Minimax với độ sâu nhỏ hơn.
-    Chúng ta chỉ cần gọi lại minimax_maze với độ sâu khác.
-    """
-    return minimax_maze(start, goal, maze, visualize, delay, max_depth)
