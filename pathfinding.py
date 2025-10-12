@@ -89,51 +89,89 @@ def greedy(start, goal, maze, visualize=False, delay=0.05):
             if 0<=nr<ROWS and 0<=nc<COLS and maze[nr][nc]==0 and (nr,nc) not in visited:
                 heapq.heappush(pq, (hx((nr,nc), goal), (nr,nc), path+[(nr,nc)]))
     return []
-
 # ================= A* =================
-def astar(start, goal, maze, visualize=False, delay=0.05):
+def astar(start, goal, maze):
+    """
+    A* tìm đường đi trên lưới maze.
+    Trả về list path từ start -> goal, hoặc None nếu không tìm được.
+    maze: 2D list, 0 = ô trống, 1 = tường
+    start, goal: tuple (row, col)
+    """
     ROWS, COLS = len(maze), len(maze[0])
-    pq = [(hx(start, goal), 0, start, [start])]
-    visited = set()
-    while pq:
-        f, g, (r,c), path = heapq.heappop(pq)
-        if (r,c) in visited:
-            continue
-        visited.add((r,c))
-        if visualize:
-            print_maze_step(maze, path, current=(r,c), start=start, goal=goal)
-            time.sleep(delay)
-        if (r,c) == goal:
-            return path
+
+    def heuristic(a, b):
+        # Manhattan distance
+        return abs(a[0]-b[0]) + abs(a[1]-b[1])
+
+    def neighbors(r, c):
         for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
             nr, nc = r+dr, c+dc
-            if 0<=nr<ROWS and 0<=nc<COLS and maze[nr][nc]==0 and (nr,nc) not in visited:
-                g2 = g+1
-                f2 = g2 + hx((nr,nc), goal)
-                heapq.heappush(pq, (f2, g2, (nr,nc), path+[(nr,nc)]))
-    return []
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0:
+                yield (nr, nc)
+
+    open_set = []
+    heapq.heappush(open_set, (heuristic(start, goal), 0, start))
+    open_set_nodes = {start}  # track các node đang trong heap
+    came_from = {}
+    g_score = {start: 0}
+
+    while open_set:
+        f, g, current = heapq.heappop(open_set)
+        open_set_nodes.remove(current)
+
+        if current == goal:
+            # build path từ start -> goal
+            path = []
+            tmp = current
+            while tmp in came_from:
+                path.append(tmp)
+                tmp = came_from[tmp]
+            path.append(start)
+            path.reverse()
+            return path
+
+        for nxt in neighbors(*current):
+            tentative_g = g_score[current] + 1
+            if nxt not in g_score or tentative_g < g_score[nxt]:
+                came_from[nxt] = current
+                g_score[nxt] = tentative_g
+                f_score = tentative_g + heuristic(nxt, goal)
+                if nxt not in open_set_nodes:
+                    heapq.heappush(open_set, (f_score, tentative_g, nxt))
+                    open_set_nodes.add(nxt)
+
+    return None  # không tìm được đường đi
+
 
 # ================= Hill Climbing =================
-def hill_climbing(start, goal, maze, visualize=False, delay=0.05, max_steps=1000):
+def hill_climbing(start, goal, maze, visualize=False, delay=0.05, max_steps=500):
     ROWS, COLS = len(maze), len(maze[0])
     current = start
     path = [current]
+
     for _ in range(max_steps):
         if current == goal:
             return path
-        neighbors = [(current[0]+dr, current[1]+dc) for dr,dc in [(1,0),(0,1),(-1,0),(0,-1)]
-                     if 0<=current[0]+dr<ROWS and 0<=current[1]+dc<COLS and maze[current[0]+dr][current[1]+dc]==0]
+
+        neighbors = [(current[0]+dr, current[1]+dc)
+                     for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]
+                     if 0 <= current[0]+dr < ROWS and 0 <= current[1]+dc < COLS and maze[current[0]+dr][current[1]+dc] == 0]
+
         if not neighbors:
             break
-        best = min(neighbors, key=lambda x:hx(x, goal))
+
+        best = min(neighbors, key=lambda x: hx(x, goal))
         if hx(best, goal) >= hx(current, goal):
             break
+
         current = best
         path.append(current)
+
         if visualize:
             print_maze_step(maze, path, current=current, start=start, goal=goal)
             time.sleep(delay)
-    return path if current==goal else []
+
+    return path
 
 # ================= Backtracking =================
 def backtracking(start, goal, maze, visualize=False, delay=0.05):
@@ -163,39 +201,43 @@ def backtracking(start, goal, maze, visualize=False, delay=0.05):
     return []
 
 # ================= Forward Checking =================
-def forwardchecking(start, goal, maze, visualize=False, delay=0.05):
+def forward_checking(start, goal, maze):
+    """
+    Forward Checking tìm đường đi từ start -> goal.
+    Trả về path dưới dạng list, giống Backtracking.
+    """
     ROWS, COLS = len(maze), len(maze[0])
     path = []
     visited = set()
-    def domain_ok(r,c):
+
+    def domain_ok(r, c):
+        # Kiểm tra có ô lân cận chưa visited và không phải tường
         for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
             nr, nc = r+dr, c+dc
-            if 0<=nr<ROWS and 0<=nc<COLS and maze[nr][nc]==0 and (nr,nc) not in visited:
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr,nc) not in visited:
                 return True
         return False
-    def fc(r,c):
-        if (r,c)==goal:
+
+    def fc(r, c):
+        if (r,c) == goal:
             path.append((r,c))
             return True
         if (r,c) in visited:
             return False
         visited.add((r,c))
         path.append((r,c))
-        if visualize:
-            print_maze_step(maze, path, current=(r,c), start=start, goal=goal)
-            time.sleep(delay)
         for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]:
             nr, nc = r+dr, c+dc
-            if 0<=nr<ROWS and 0<=nc<COLS and maze[nr][nc]==0 and (nr,nc) not in visited:
-                if domain_ok(nr,nc):
-                    if fc(nr,nc):
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and (nr,nc) not in visited:
+                if domain_ok(nr, nc):
+                    if fc(nr, nc):
                         return True
         path.pop()
         return False
+
     if fc(start[0], start[1]):
         return path
-    return []
-
+    return []  # không tìm thấy đường đi
 # ================= UCS =================
 def ucs(start, goal, maze, visualize=False, delay=0.05):
     ROWS, COLS = len(maze), len(maze[0])
@@ -238,7 +280,7 @@ def dls(start, goal, maze, limit, visualize=False, delay=0.05):
                 stack.append(((nr,nc), path+[(nr,nc)], depth+1))
     return None
 
-def ids(start, goal, maze, max_depth=50, visualize=False, delay=0.05):
+def ids(start, goal, maze, max_depth=150, visualize=False, delay=0.05):
     for depth in range(max_depth+1):
         result = dls(start, goal, maze, depth, visualize=visualize, delay=delay)
         if result is not None:
@@ -246,87 +288,77 @@ def ids(start, goal, maze, max_depth=50, visualize=False, delay=0.05):
     return []
 
 # ================= Simulated Annealing =================
-def simulated_annealing(start, goal, maze, visualize=False, delay=0.05, max_steps=1000, T=100.0, alpha=0.99):
+def simulated_annealing(start, goal, maze, visualize=False, delay=0.05, max_steps=1000, T=100.0, alpha=0.98):
     ROWS, COLS = len(maze), len(maze[0])
     current = start
     path = [current]
+
     for _ in range(max_steps):
-        if current==goal:
+        if current == goal:
             return path
-        neighbors = [(current[0]+dr, current[1]+dc) for dr,dc in [(1,0),(0,1),(-1,0),(0,-1)]
-                     if 0<=current[0]+dr<ROWS and 0<=current[1]+dc<COLS and maze[current[0]+dr][current[1]+dc]==0]
+
+        neighbors = [(current[0]+dr, current[1]+dc)
+                     for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]
+                     if 0 <= current[0]+dr < ROWS and 0 <= current[1]+dc < COLS and maze[current[0]+dr][current[1]+dc] == 0]
+
         if not neighbors:
             break
-        next_node = random.choice(neighbors)
-        deltaE = hx(current, goal)-hx(next_node, goal)
-        if deltaE>0 or random.random() < math.exp(deltaE/T if T>0 else 0):
-            current = next_node
+
+        nxt = random.choice(neighbors)
+        deltaE = hx(current, goal) - hx(nxt, goal)
+        if deltaE > 0 or random.random() < math.exp(deltaE / (T + 1e-5)):
+            current = nxt
             path.append(current)
             if visualize:
                 print_maze_step(maze, path, current=current, start=start, goal=goal)
                 time.sleep(delay)
         T *= alpha
-    return path if current==goal else []
+
+    return path
 
 # ================= Genetic Algorithm =================
-def genetic(start, goal, maze, pop_size=50, generations=200, mutation_rate=0.1, max_steps=100, visualize=False, delay=0.05):
+def genetic(start, goal, maze, pop_size=40, generations=100, mutation_rate=0.1, max_steps=80, visualize=False, delay=0.05):
     ROWS, COLS = len(maze), len(maze[0])
+
     def random_path():
-        path = [start]
-        current = start
+        p, cur = [start], start
         for _ in range(max_steps):
-            if current == goal:
+            if cur == goal:
                 break
-            neighbors = [(current[0]+dr,current[1]+dc) for dr,dc in [(1,0),(0,1),(-1,0),(0,-1)]
-                         if 0<=current[0]+dr<ROWS and 0<=current[1]+dc<COLS and maze[current[0]+dr][current[1]+dc]==0]
+            neighbors = [(cur[0]+dr, cur[1]+dc)
+                         for dr, dc in [(1,0),(0,1),(-1,0),(0,-1)]
+                         if 0 <= cur[0]+dr < ROWS and 0 <= cur[1]+dc < COLS and maze[cur[0]+dr][cur[1]+dc] == 0]
             if not neighbors:
                 break
-            current = random.choice(neighbors)
-            path.append(current)
-        return path
+            cur = random.choice(neighbors)
+            p.append(cur)
+        return p
+
     def fitness(path):
-        last = path[-1]
-        dist = abs(last[0]-goal[0])+abs(last[1]-goal[1])
-        return 1/(dist+1+len(path)*0.01)
-    def crossover(p1,p2):
-        cut = min(len(p1),len(p2))//2
-        child = p1[:cut]
-        for step in p2:
-            if step not in child:
-                child.append(step)
-        return child
-    def mutate(path):
-        if len(path)<=2:
-            return path
-        if random.random()<mutation_rate:
-            idx = random.randint(1,len(path)-1)
-            path = path[:idx]
-            current = path[-1]
-            for _ in range(max_steps-idx):
-                if current==goal:
-                    break
-                neighbors = [(current[0]+dr,current[1]+dc) for dr,dc in [(1,0),(0,1),(-1,0),(0,-1)]
-                             if 0<=current[0]+dr<ROWS and 0<=current[1]+dc<COLS and maze[current[0]+dr][current[1]+dc]==0]
-                if not neighbors:
-                    break
-                current = random.choice(neighbors)
-                path.append(current)
-        return path
+        dist = hx(path[-1], goal)
+        return 1 / (1 + dist + len(path) * 0.1)
+
     population = [random_path() for _ in range(pop_size)]
+
     for _ in range(generations):
-        population.sort(key=lambda x:-fitness(x))
-        if population[0][-1]==goal:
+        population.sort(key=lambda p: -fitness(p))
+        best = population[0]
+        if best[-1] == goal:
             if visualize:
-                for step in population[0]:
-                    print_maze_step(maze, path=population[0], current=step, start=start, goal=goal)
+                for step in best:
+                    print_maze_step(maze, best, current=step, start=start, goal=goal)
                     time.sleep(delay)
-            return population[0]
-        next_gen = population[:pop_size//2]
-        while len(next_gen)<pop_size:
-            p1,p2 = random.sample(population[:10],2)
-            child = mutate(crossover(p1,p2))
-            next_gen.append(child)
-        population = next_gen
+            return best
+        new_pop = population[:pop_size//2]
+        while len(new_pop) < pop_size:
+            p1, p2 = random.sample(population[:10], 2)
+            cut = min(len(p1), len(p2)) // 2
+            child = p1[:cut] + [s for s in p2 if s not in p1[:cut]]
+            if random.random() < mutation_rate:
+                child = random_path()
+            new_pop.append(child)
+        population = new_pop
+
     return population[0]
 
 # ================= AC-3 (simplified) =================
@@ -366,29 +398,78 @@ def and_or_graph_search(problem):
     return or_search(problem.initial, [])
 
 # ================= Minimax/Alpha-Beta =================
-def minimax(state, depth, maximize=True):
-    if depth==0 or state.is_terminal():
-        return state.utility(), None
-    if maximize:
+# ================= Minimax (Maze Version) =================
+directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+def hx(pos, goal):
+    # Heuristic: Manhattan distance
+    return abs(pos[0] - goal[0]) + abs(pos[1] - goal[1])
+
+def print_maze_step(maze, path=None, current=None, start=None, goal=None):
+    if path is None:
+        path = []
+    display = ""
+    for r in range(len(maze)):
+        for c in range(len(maze[0])):
+            if (r, c) == start:
+                display += "S"
+            elif (r, c) == goal:
+                display += "G"
+            elif (r, c) == current:
+                display += "*"
+            elif (r, c) in path:
+                display += "o"
+            elif maze[r][c] == 1:
+                display += "#"
+            else:
+                display += "."
+        display += "\n"
+    print(display)
+
+def minimax(node, goal, maze, depth, maximizing=True, visited=None, visualize=False, delay=0.05):
+    ROWS, COLS = len(maze), len(maze[0])
+    if visited is None:
+        visited = set()
+
+    def heuristic(pos):
+        return -hx(pos, goal)
+
+    if depth == 0 or node == goal:
+        return heuristic(node), [node]
+
+    visited.add(node)
+    if visualize:
+        print_maze_step(maze, [node], current=node, start=None, goal=goal)
+        time.sleep(delay)
+
+    best_path = [node]
+
+    if maximizing:
         best_val = -math.inf
-        best_move = None
-        for move in state.get_moves():
-            val,_ = minimax(state.make_move(move), depth-1, False)
-            if val>best_val:
-                best_val = val
-                best_move = move
-        return best_val, best_move
+        for dr, dc in directions:
+            nr, nc = node[0]+dr, node[1]+dc
+            nxt = (nr, nc)
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
+                val, p = minimax(nxt, goal, maze, depth-1, False, visited.copy(), visualize, delay)
+                if val > best_val:
+                    best_val, best_path = val, [node] + p
     else:
         best_val = math.inf
-        best_move = None
-        for move in state.get_moves():
-            val,_ = minimax(state.make_move(move), depth-1, True)
-            if val<best_val:
-                best_val = val
-                best_move = move
-        return best_val, best_move
+        for dr, dc in directions:
+            nr, nc = node[0]+dr, node[1]+dc
+            nxt = (nr, nc)
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
+                val, p = minimax(nxt, goal, maze, depth-1, True, visited.copy(), visualize, delay)
+                if val < best_val:
+                    best_val, best_path = val, [node] + p
+    return best_val, best_path
 
-def alphabeta(state, depth, alpha=-math.inf, beta=math.inf, maximize=True):
+def minimax_maze(start, goal, maze, max_depth=5, visualize=False, delay=0.05):
+    _, path = minimax(start, goal, maze, max_depth, True, set(), visualize, delay)
+    return path if path else [start]
+
+
+def alpha_beta(state, depth, alpha=-math.inf, beta=math.inf, maximize=True):
     if depth==0 or state.is_terminal():
         return state.utility(), None
     if maximize:
@@ -444,3 +525,30 @@ def online_dfs(start, goal, maze, visualize=False, delay=0.05):
                 stack.append((nr,nc))
                 path.append((nr,nc))
     return path
+# ================= Minimax-Limited =================
+def minimax_limited(start, goal, maze, max_depth=4, visualize=False, delay=0.05):
+    ROWS, COLS = len(maze), len(maze[0])
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+    def heuristic(pos):
+        return -hx(pos, goal)
+
+    def dfs_limited(node, depth, visited):
+        if depth == 0 or node == goal:
+            return heuristic(node), [node]
+        visited.add(node)
+        if visualize:
+            print_maze_step(maze, [node], current=node, start=start, goal=goal)
+            time.sleep(delay)
+        best_val, best_path = -math.inf, [node]
+        for dr, dc in directions:
+            nr, nc = node[0]+dr, node[1]+dc
+            nxt = (nr, nc)
+            if 0 <= nr < ROWS and 0 <= nc < COLS and maze[nr][nc] == 0 and nxt not in visited:
+                val, p = dfs_limited(nxt, depth-1, visited.copy())
+                if val > best_val:
+                    best_val, best_path = val, [node] + p
+        return best_val, best_path
+
+    _, path = dfs_limited(start, max_depth, set())
+    return path if path else [start]
