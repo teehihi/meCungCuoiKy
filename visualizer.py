@@ -24,6 +24,8 @@ MODE_TO_FUNC = {
     "online": "online_dfs",
     "minimax": "minimax_maze",
     "alphabeta": "alpha_beta",
+    "pos": "pos_search",
+    "minimax_limited": "minimax_limited",
 }
 
 # === Hiệu ứng hiển thị ===
@@ -166,7 +168,21 @@ def visualize_path(maze, start, goal, mode, offset_x=0.0, offset_y=0.0, speed_ms
     screen = utils.screen
     clock = pygame.time.Clock()
     base_frame = screen.copy()
-
+    print(f"--- DEBUGGING MAP FOR MODE: {mode.upper()} ---")
+    print(f"Start: {start}, Goal: {goal}")
+    for r_idx, row in enumerate(maze):
+        line = ""
+        for c_idx, cell in enumerate(row):
+            if (r_idx, c_idx) == start:
+                line += "S" # Vị trí Start
+            elif (r_idx, c_idx) == goal:
+                line += "G" # Vị trí Goal
+            elif cell == 1:
+                line += "#" # Tường
+            else:
+                line += "." # Đường đi
+        print(line)
+    print("------------------------------------------")
     func_name = MODE_TO_FUNC.get(mode.lower(), None)
     algo_func = getattr(pathfinding, func_name, None)
 

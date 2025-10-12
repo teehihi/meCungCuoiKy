@@ -19,13 +19,13 @@ algorithm_groups = {
         ("UCS", "ucs"),
     ],
     "Tìm kiếm cục bộ": [
-        ("Hill Climbing", "hill_climbing"),
-        ("Simulated Annealing", "simulated_annealing"),
+        ("Hill Climbing", "hillclimbing"),   
+        ("Simulated Annealing", "sa"),         
         ("Genetic", "genetic"),
     ],
     "Tìm kiếm môi trường phức tạp": [
-        ("AND-OR", "and_or_tree_search"),
-        ("Online DFS", "online_dfs"),
+        ("AND-OR", "and_or"),             
+        ("Online DFS", "online"),          
         ("POS", "pos"),
     ],
     "Tìm kiếm môi trường ràng buộc": [
