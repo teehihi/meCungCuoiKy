@@ -9,6 +9,7 @@ from constants import (
     CELL_SIZE, VIEWPORT_W, VIEWPORT_H, MAP_COLS, MAP_ROWS,
     CAMERA_LERP, available_themes, asset_path
 )
+import visualizer
 
 # Khởi tạo các biến toàn cục cho game loop
 wall_mapping = {}
@@ -113,6 +114,7 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                     hunter_start_pos = [r, c]
                     break
     hunter = Hunter(hunter_start_pos, theme)
+    visualizer.register_hunter(hunter)
 
     hunter_stun_timer, STUN_DURATION, RESPAWN_DISTANCE = 0, 1000, 5
     coins, keys = initial_coins, initial_keys   
@@ -191,6 +193,9 @@ def game_loop(mode, initial_coins=0, initial_keys=0,  initial_lives=5):
                     paused = False
                 if buttons.get("surrender") and buttons["surrender"].collidepoint(event.pos):
                     stop_all_sfx(); pygame.mixer.music.stop(); return "exit", coins, keys
+                elif "visualize" in buttons and buttons["visualize"].collidepoint(event.pos):
+                    visualizer.visualize_path(maze, hunter.pos, player.pos, mode, offset_x, offset_y)
+
                 if event.button == 1 and event.pos[0] < VIEWPORT_W and event.pos[1] < VIEWPORT_H:
                     dragging, last_mouse_pos = True, event.pos
                 elif event.button == 1 and panel_rect.collidepoint(event.pos):

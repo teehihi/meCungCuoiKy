@@ -424,6 +424,14 @@ def draw_control_panel(view_w, view_h, paused, mode_name="", coins=0, keys=0, li
     surrender_btn = pygame.Rect(x, y, btn_w, btn_h)
     draw_control_button(surrender_btn, "Surrender", (200, 60, 60))
     buttons["surrender"] = surrender_btn
+
+        # === Visualize Path (chỉ hiện khi pause) ===
+    if paused:
+        y += btn_h + gap
+        visualize_btn = pygame.Rect(x, y, btn_w, btn_h)
+        draw_control_button(visualize_btn, "Visualize", (100, 180, 250))
+        buttons["visualize"] = visualize_btn
+
     return buttons, panel_w
 
 def get_control_buttons(paused):
@@ -439,6 +447,9 @@ def get_control_buttons(paused):
     buttons["reset"] = pygame.Rect(x, y, btn_w, btn_h)
     y += btn_h + gap
     buttons["surrender"] = pygame.Rect(x, y, btn_w, btn_h)
+    if paused:
+        y += btn_h + gap
+        buttons["visualize"] = pygame.Rect(x, y, btn_w, btn_h)
     return buttons
 
 def draw_control_button(rect, text, color):
