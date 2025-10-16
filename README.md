@@ -123,83 +123,44 @@ Dự án này hướng tới việc:
 ---
 
 ## 🎬 Demo
+
 ### 🟨 Menu của Maze Hunter
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExcTZ0ZjdtZ3FpMW5lN2J6bDUxOGtrdXd5YXMyaGF3Zms4NDc3OWdoZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/h7HDVPzJgUBZ3UHAfA/giphy.gif" width="320"><br>
-      <strong>🏠 Menu Chính</strong>
-    </td>
-    <td align="center">
-      <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWVqbjdpN3pzN3Y1NzNicXZjZTA3cHNvZDcxMTI4amRtcmFlNGVmNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/quSGsK4tryxNRz9GKS/giphy.gif" width="320"><br>
-      <strong>🎮 Menu Chọn Chế Độ</strong>
-    </td>
-    <td align="center">
-      <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ2RoajJ6cGNuZzA4NnV3MTNzNTNkNzYyMmJoYXBodG9jaTRkMG5kMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1V9czVH90fJ3WwSU3A/giphy.gif" width="320"><br>
-      <strong>⚙️ Màn Hình Loading</strong>
-    </td>
-  </tr>
-</table>
+
+| 🏠 Menu Chính | 🎮 Menu Chọn Chế Độ | ⚙️ Màn Hình Loading |
+|:--------------:|:------------------:|:------------------:|
+| <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExcTZ0ZjdtZ3FpMW5lN2J6bDUxOGtrdXd5YXMyaGF3Zms4NDc3OWdoZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/h7HDVPzJgUBZ3UHAfA/giphy.gif" width="300"/> | <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWVqbjdpN3pzN3Y1NzNicXZjZTA3cHNvZDcxMTI4amRtcmFlNGVmNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/quSGsK4tryxNRz9GKS/giphy.gif" width="300"/> | <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ2RoajJ6cGNuZzA4NnV3MTNzNTNkNzYyMmJoYXBodG9jaTRkMG5kMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1V9czVH90fJ3WwSU3A/giphy.gif" width="300"/> |
+
+---
 
 ### 🟪 Giao diện chính
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTFicW95dnVvcHVxbmc1M204dmVlZDM5emJsN2R0a3FiNzdzOW1xaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/RTYkOCeh3CXl39f5MB/giphy.gif" width="320"><br>
-      <strong>🎮 Game Play Chính</strong>
-    </td>
-    <td align="center">
-      <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExY3Uxdng3bm85ZDhkeWduMGZrMDJyczhrc3B3NWV4NDZ0OWNuYmx4cCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/AoliG8SixDEgCZe3Hi/giphy.gif" width="320"><br>
-      <strong>💥 Va Chạm Khi Chưa Hết Máu</strong>
-    </td>
-    <td align="center">
-      <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExYW9jMjMwano3MGVpZ21vdmg5cG1xNno3dDlnMzl1cDUwcGhjdXRyMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ZhHdVdzx7da7jCVDcN/giphy.gif" width="320"><br>
-      <strong>☠️ Hết Máu & Thua</strong>
-    </td>
-  </tr>
-</table>
+
+| 🎮 Game Play Chính | 💥 Va Chạm Khi Chưa Hết Máu | ☠️ Hết Máu & Thua |
+|:------------------:|:--------------------------:|:----------------:|
+| <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTFicW95dnVvcHVxbmc1M204dmVlZDM5emJsN2R0a3FiNzdzOW1xaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/RTYkOCeh3CXl39f5MB/giphy.gif" width="300"/> | <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExY3Uxdng3bm85ZDhkeWduMGZrMDJyczhrc3B3NWV4NDZ0OWNuYmx4cCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/AoliG8SixDEgCZe3Hi/giphy.gif" width="300"/> | <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExYW9jMjMwano3MGVpZ21vdmg5cG1xNno3dDlnMzl1cDUwcGhjdXRyMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ZhHdVdzx7da7jCVDcN/giphy.gif" width="300"/> |
+
+---
 
 ### 🟧 Giao diện câu hỏi
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExa2JoMmNvcjdnamdidzlzeXZwbnRsb216MXZoa2ZncDNxYTYxdjRxMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/klFNZ0XhJcO8Rk33rz/giphy.gif" width="320"><br>
-      <strong>❌ Trả Lời Sai</strong>
-    </td>
-    <td align="center">
-      <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExamozbTZrZzNob2pyY2VkbnZ5a28yZ2x5MTh6MXRpaDNlY3A1d3FzYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/r5CpASYBt3VdaFHhLM/giphy.gif" width="320"><br>
-      <strong>✅ Trả Lời Đúng</strong>
-    </td>
-    <td align="center">
-      <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmh0dXh4MGV6Z2Q3ZjgzdnRpNDRyaDk3N2w2djc4eHg0cGE4YmlnNCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ceKtX9GfLpP06qqT3V/giphy.gif" width="320"><br>
-      <strong>💰 Đủ Xu Để Bỏ Qua Câu Hỏi</strong>
-    </td>
-  </tr>
-</table>
+
+| ❌ Trả Lời Sai | ✅ Trả Lời Đúng | 💰 Đủ Xu Để Bỏ Qua Câu Hỏi |
+|:--------------:|:---------------:|:--------------------------:|
+| <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExa2JoMmNvcjdnamdidzlzeXZwbnRsb216MXZoa2ZncDNxYTYxdjRxMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/klFNZ0XhJcO8Rk33rz/giphy.gif" width="300"/> | <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExamozbTZrZzNob2pyY2VkbnZ5a28yZ2x5MTh6MXRpaDNlY3A1d3FzYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/r5CpASYBt3VdaFHhLM/giphy.gif" width="300"/> | <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmh0dXh4MGV6Z2Q3ZjgzdnRpNDRyaDk3N2w2djc4eHg0cGE4YmlnNCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ceKtX9GfLpP06qqT3V/giphy.gif" width="300"/> |
+
+---
 
 ### 🟩 Điều kiện qua màn
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExN2hiNXdiOGdsbXd3aHUyOHgwa2tpcTZ0OHRlNWs1ODA0M2p0dTc4bSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/lM8g9I0z6nSxZUmW1a/giphy.gif" width="320"><br>
-      <strong>🔒 Chạm Rương Khi Chưa Đủ Chìa</strong>
-    </td>
-    <td align="center">
-      <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGRtZnY1Zmp3ZjFqaG13cWc2dHZydnp5aHNwN256ZXl4ZjZueHcxNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/XUfVeOK1ChAWaH7zob/giphy.gif" width="320"><br>
-      <strong>🏆 Đủ Chìa Và Mở Rương Thành Công</strong>
-    </td>
-  </tr>
-</table>
+
+| 🔒 Chạm Rương Khi Chưa Đủ Chìa | 🏆 Đủ Chìa Và Mở Rương Thành Công |
+|:------------------------------:|:--------------------------------:|
+| <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExN2hiNXdiOGdsbXd3aHUyOHgwa2tpcTZ0OHRlNWs1ODA0M2p0dTc4bSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/lM8g9I0z6nSxZUmW1a/giphy.gif" width="300"/> | <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGRtZnY1Zmp3ZjFqaG13cWc2dHZydnp5aHNwN256ZXl4ZjZueHcxNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/XUfVeOK1ChAWaH7zob/giphy.gif" width="300"/> |
+
+---
 
 ### 🟦 Minh hoạ thuật toán
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDVoamttc2JzZjhteWI2NDEwbnZ2NnJvaTE1MHI2aXN4b2NocGE2dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1WuKxMJwcY1Gecpo08/giphy.gif" width="320"><br>
-      <strong>🔍 Minh Hoạ Thuật Toán AI</strong>
-    </td>
-  </tr>
-</table>
+
+| 🔍 Minh Hoạ Thuật Toán AI |
+|:--------------------------:|
+| <img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDVoamttc2JzZjhteWI2NDEwbnZ2NnJvaTE1MHI2aXN4b2NocGE2dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1WuKxMJwcY1Gecpo08/giphy.gif" width="300"/> |
 
 ---
 
