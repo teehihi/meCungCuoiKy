@@ -50,7 +50,8 @@
 | **Tìm kiếm có thông tin (Informed Search)** | Greedy Search, A* |
 | **Tối ưu cục bộ / Metaheuristic** | Hill Climbing, Simulated Annealing, Genetic Algorithm |
 | **CSP / Ràng buộc** | Backtracking, Forward Checking, AC-3 |
-| **Tùy chỉnh** | Partial Search, And-Or Search, Belief Space Search |
+| **Phức tạp** | Partial Search, And-Or Search, Belief Space Search |
+| **Đối kháng** | MiniMax, Alpha - Beta, MiniMax Limited |
 
 > Mỗi thuật toán mang lại một hành vi khác nhau của Hunter — từ truy đuổi theo đường ngắn nhất (A*) đến leo đồi, di truyền, hoặc tìm kiếm ngẫu nhiên.
 
