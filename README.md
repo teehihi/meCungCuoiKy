@@ -130,11 +130,11 @@ Dự án này hướng tới việc:
 <table align="center">
   <tr>
     <td align="center" width="300">
-      <img src="https://media2.giphy.com/media/h7HDVPzJgUBZ3UHAfA/giphy.gif" width="260"><br>
+      <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3l4N2o0Z3FhbDdzaW9nenhoMGExcmZkMmlrOTc3c3NiaWU0bjAyaiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ZLUxq62HazOTeLS9jE/giphy.gif" width="260"><br>
       <strong>🏠 Menu Chính</strong>
     </td>
     <td align="center" width="300">
-      <img src="https://media4.giphy.com/media/quSGsK4tryxNRz9GKS/giphy.gif" width="260"><br>
+      <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExb2c1ZWJhNHNibjZ0MjhjdWZ4cmR2YjBuNDFwaGw2OThhYzhidWl1ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/lj53F8Anj7jaL11uyB/giphy.gif" width="260"><br>
       <strong>🎮 Menu Chọn Chế Độ</strong>
     </td>
     <td align="center" width="300">
@@ -151,7 +151,7 @@ Dự án này hướng tới việc:
 <table align="center">
   <tr>
     <td align="center" width="300">
-      <img src="https://media4.giphy.com/media/RTYkOCeh3CXl39f5MB/giphy.gif" width="260"><br>
+      <img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExOGQ3NjU3dHplYWlxcTV1ZGw0aDYzdzUxZXVseHE3bGhweTVhMG1tdSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/CTF3ctDQNVei069FBQ/giphy.gif" width="260"><br>
       <strong>🎮 Game Play Chính</strong>
     </td>
     <td align="center" width="300">
@@ -180,7 +180,7 @@ Dự án này hướng tới việc:
       <strong>✅ Trả Lời Đúng</strong>
     </td>
     <td align="center" width="300">
-      <img src="https://media4.giphy.com/media/ceKtX9GfLpP06qqT3V/giphy.gif" width="260"><br>
+      <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExZHNwejlteHg1cnFwMWt6Mzd6cDl0ajRrNDc1d3RhYmYzMXpqbG53MiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/8lJzwLuku4HFPrn1zr/giphy.gif" width="260"><br>
       <strong>💰 Đủ Xu Để Bỏ Qua Câu Hỏi</strong>
     </td>
   </tr>
@@ -193,7 +193,7 @@ Dự án này hướng tới việc:
 <table align="center">
   <tr>
     <td align="center" width="300">
-      <img src="https://media2.giphy.com/media/lM8g9I0z6nSxZUmW1a/giphy.gif" width="260"><br>
+      <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExeW10aHh2dnR5ZDYyZmUwYzR0dGxhZWQzaTF5anE2cTIwNmI5aHdkaCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/LtkAmjuoi5KtIyzjXP/giphy.gif" width="260"><br>
       <strong>🔒 Chạm Rương Khi Chưa Đủ Chìa</strong>
     </td>
     <td align="center" width="300">
