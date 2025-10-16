@@ -144,6 +144,7 @@ Dự án này hướng tới việc:
   </tr>
 </table>
 
+> Đã thử nhiều lần nhưng không hiện GIF 😭😭😭 Maybe do khác tỉ lệ khung
 ---
 
 ## 🟪 Giao diện chính
